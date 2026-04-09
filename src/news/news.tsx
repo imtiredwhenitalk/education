@@ -161,7 +161,7 @@ export default function NewsBoard({
 										{new Date(item.createdAt).toLocaleString()} | {item.author}
 									</p>
 									{item.attachments?.length ? (
-										<div className="mt-3 grid gap-2">
+										<div className="mt-3 grid gap-3">
 											{item.attachments.map((file) => (
 												<div key={file.id} className="rounded-xl border border-slate-200 p-2 text-xs">
 													<a
@@ -176,7 +176,14 @@ export default function NewsBoard({
 														<img
 															src={file.dataUrl}
 															alt={file.name}
-															className="mt-2 max-h-48 rounded-lg object-cover"
+															className="mt-2 max-h-[80vh] w-full rounded-lg object-contain"
+														/>
+													) : null}
+													{file.mimeType === "application/pdf" ? (
+														<iframe
+															title={file.name}
+															src={`${file.dataUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+															className="mt-2 h-[78vh] w-full rounded-lg border border-slate-200 bg-white"
 														/>
 													) : null}
 												</div>

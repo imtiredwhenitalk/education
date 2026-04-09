@@ -837,6 +837,39 @@ export default function Page() {
                     </p>
                     <h4 className="mt-1 text-lg font-bold text-slate-900">{item.title}</h4>
                     <p className="mt-2 text-sm text-slate-600">{item.body.slice(0, 130)}...</p>
+                    {item.attachments?.length ? (
+                      <div className="mt-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {item.attachments
+                            .filter((file) => file.mimeType.startsWith("image/"))
+                            .slice(0, 2)
+                            .map((file) => (
+                              <img
+                                key={file.id}
+                                src={file.dataUrl}
+                                alt={file.name}
+                                className="h-24 w-full rounded-lg object-cover"
+                              />
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {item.attachments
+                            .filter((file) => !file.mimeType.startsWith("image/"))
+                            .slice(0, 2)
+                            .map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.dataUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700"
+                              >
+                                {file.name}
+                              </a>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <button
                       onClick={() => {
                         setSelectedPublicNewsId(item.id);
@@ -933,18 +966,63 @@ export default function Page() {
                   {selectedPublicNews.body}
                 </p>
                 {selectedPublicNews.attachments?.length ? (
-                  <div className="mt-4 grid gap-2">
-                    {selectedPublicNews.attachments.map((file) => (
-                      <a
-                        key={file.id}
-                        href={file.dataUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-sky-700"
-                      >
-                        {file.name}
-                      </a>
-                    ))}
+                  <div className="mt-4 space-y-3">
+                    <div className="grid gap-3">
+                      {selectedPublicNews.attachments
+                        .filter((file) => file.mimeType.startsWith("image/"))
+                        .map((file) => (
+                          <figure key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                            <img
+                              src={file.dataUrl}
+                              alt={file.name}
+                              className="max-h-[80vh] w-full rounded-lg object-contain"
+                            />
+                            <figcaption className="mt-2 text-xs font-semibold text-slate-600">{file.name}</figcaption>
+                          </figure>
+                        ))}
+                    </div>
+
+                    <div className="space-y-3">
+                      {selectedPublicNews.attachments
+                        .filter((file) => file.mimeType === "application/pdf")
+                        .map((file) => (
+                          <article key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                            <p className="mb-2 text-sm font-semibold text-slate-700">{file.name}</p>
+                            <iframe
+                              title={file.name}
+                              src={`${file.dataUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                              className="h-[78vh] w-full rounded-lg border border-slate-200 bg-white"
+                            />
+                            <div className="mt-2 flex justify-end">
+                              <a
+                                href={file.dataUrl}
+                                download={file.name}
+                                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                              >
+                                Завантажити PDF
+                              </a>
+                            </div>
+                          </article>
+                        ))}
+                    </div>
+
+                    <div className="grid gap-2">
+                      {selectedPublicNews.attachments
+                        .filter(
+                          (file) => !file.mimeType.startsWith("image/") && file.mimeType !== "application/pdf",
+                        )
+                        .map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.dataUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-sky-700"
+                          >
+                            {file.name}
+                          </a>
+                        ))}
+                    </div>
                   </div>
                 ) : null}
               </article>
@@ -959,6 +1037,39 @@ export default function Page() {
                     </p>
                     <h4 className="mt-1 text-lg font-bold text-slate-900">{item.title}</h4>
                     <p className="mt-2 text-sm text-slate-600">{item.body.slice(0, 170)}...</p>
+                    {item.attachments?.length ? (
+                      <div className="mt-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {item.attachments
+                            .filter((file) => file.mimeType.startsWith("image/"))
+                            .slice(0, 2)
+                            .map((file) => (
+                              <img
+                                key={file.id}
+                                src={file.dataUrl}
+                                alt={file.name}
+                                className="h-24 w-full rounded-lg object-cover"
+                              />
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {item.attachments
+                            .filter((file) => !file.mimeType.startsWith("image/"))
+                            .slice(0, 2)
+                            .map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.dataUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-sky-700"
+                              >
+                                {file.name}
+                              </a>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <button
                       onClick={() => setSelectedPublicNewsId(item.id)}
                       className="mt-3 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
