@@ -35,8 +35,8 @@ type AdmissionFormState = {
 
 const themeClass: Record<Theme, string> = {
   light: "bg-slate-100 text-slate-900",
-  dark: "bg-slate-950 text-slate-100",
-  ocean: "bg-cyan-950 text-cyan-50",
+  dark: "bg-slate-950 text-slate-900",
+  ocean: "bg-cyan-950 text-cyan-900",
 };
 
 const defaultGradeForm: GradeFormState = {
