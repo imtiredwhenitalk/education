@@ -1,5 +1,5 @@
 export type Role = "student" | "teacher" | "admin";
-export type Theme = "light" | "dark" | "ocean";
+export type Theme = "light";
 
 export type SchoolUser = {
   id: string;

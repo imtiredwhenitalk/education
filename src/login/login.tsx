@@ -36,7 +36,7 @@ export default function LoginPanel(props: LoginPanelProps) {
 				<button
 					onClick={onSubmit}
 					disabled={loading}
-					className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+					className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white transition-all duration-300 hover:bg-blue-700 hover:scale-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none"
 				>
 					{loading ? "Завантаження..." : "Увійти"}
 				</button>

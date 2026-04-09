@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SchoolUser, Theme } from "../types";
+import type { SchoolUser } from "../types";
 
 type ProfilePageProps = {
 	user: SchoolUser;
@@ -11,14 +11,12 @@ export default function ProfilePage({ user, onSave }: ProfilePageProps) {
 	const [className, setClassName] = useState(user.className);
 	const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl);
 	const [bio, setBio] = useState(user.bio);
-	const [theme, setTheme] = useState<Theme>(user.theme || "light");
 
 	useEffect(() => {
 		setFullName(user.fullName);
 		setClassName(user.className);
 		setAvatarUrl(user.avatarUrl);
 		setBio(user.bio);
-		setTheme(user.theme || "light");
 	}, [user]);
 
 	const uploadAvatar = (file: File | null) => {
@@ -66,15 +64,6 @@ export default function ProfilePage({ user, onSave }: ProfilePageProps) {
 						onChange={(e) => setAvatarUrl(e.target.value)}
 						placeholder="URL аватарки"
 					/>
-					<select
-						className="rounded-lg border border-slate-300 px-3 py-2"
-						value={theme}
-						onChange={(e) => setTheme(e.target.value as Theme)}
-					>
-						<option value="light">Light</option>
-						<option value="dark">Dark</option>
-						<option value="ocean">Ocean</option>
-					</select>
 					<textarea
 						className="min-h-28 rounded-lg border border-slate-300 px-3 py-2"
 						value={bio}
@@ -82,8 +71,8 @@ export default function ProfilePage({ user, onSave }: ProfilePageProps) {
 						placeholder="Про себе"
 					/>
 					<button
-						onClick={() => onSave({ fullName, className, avatarUrl, bio, theme })}
-						className="rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white"
+						onClick={() => onSave({ fullName, className, avatarUrl, bio })}
+						className="rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105 hover:shadow-lg"
 					>
 						Зберегти профіль
 					</button>

@@ -8,6 +8,8 @@ type AdminPanelProps = {
 		id: string,
 		payload: { status: AdmissionStatus; assignedTeacherId?: string; adminComment?: string },
 	) => Promise<void>;
+	onDeleteUser: (id: string) => Promise<void>;
+	user: SchoolUser;
 };
 
 type AdmissionDraft = {
@@ -16,7 +18,7 @@ type AdmissionDraft = {
 	adminComment: string;
 };
 
-export default function AdminPanel({ users, admissions, onUpdateAdmission }: AdminPanelProps) {
+export default function AdminPanel({ users, admissions, onUpdateAdmission, onDeleteUser, user }: AdminPanelProps) {
 	const [query, setQuery] = useState("");
 	const [roleFilter, setRoleFilter] = useState("all");
 	const [savingId, setSavingId] = useState("");
@@ -177,7 +179,7 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission }: Adm
 									<button
 										onClick={() => saveAdmission(item.id)}
 										disabled={savingId === item.id}
-										className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+										className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-all duration-300 hover:bg-emerald-700 hover:scale-105 hover:shadow-lg"
 									>
 										{savingId === item.id ? "Збереження..." : "Зберегти рішення"}
 									</button>
@@ -223,12 +225,24 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission }: Adm
 				</select>
 			</div>
 			<div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-				{filtered.map((user) => (
-					<article key={user.id} className="rounded-xl border border-slate-300 bg-white p-4">
-						<p className="font-semibold text-slate-900">{user.fullName}</p>
-						<p className="text-sm text-slate-600">{user.email}</p>
-						<p className="mt-2 text-xs uppercase tracking-wide text-slate-500">{user.role}</p>
-						<p className="text-xs text-slate-500">{user.className}</p>
+				{filtered.map((u) => (
+					<article key={u.id} className="rounded-xl border border-slate-300 bg-white p-4">
+						<p className="font-semibold text-slate-900">{u.fullName}</p>
+						<p className="text-sm text-slate-600">{u.email}</p>
+						<p className="mt-2 text-xs uppercase tracking-wide text-slate-500">{u.role}</p>
+						<p className="text-xs text-slate-500">{u.className}</p>
+						{u.id !== user.id && (
+							<button
+								onClick={() => {
+									if (window.confirm(`Видалити користувача ${u.fullName}? Цю дію неможливо скасувати.`)) {
+										onDeleteUser(u.id);
+									}
+								}}
+								className="mt-2 rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-rose-700 hover:scale-105"
+							>
+								Видалити
+							</button>
+						)}
 					</article>
 				))}
 			</div>

@@ -74,6 +74,12 @@ export const api = {
 		return result.users;
 	},
 
+	deleteUser: async (id: string) => {
+		return request<{ ok: boolean }>(`/api/users/${id}`, {
+			method: "DELETE",
+		});
+	},
+
 	getNews: async () => {
 		const result = await request<{ news: NewsItem[] }>("/api/news");
 		return result.news;

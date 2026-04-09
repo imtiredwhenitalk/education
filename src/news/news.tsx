@@ -114,7 +114,7 @@ export default function NewsBoard({
 												onUpdate(item.id, editingTitle, editingBody, editingAttachments);
 												setEditingId("");
 											}}
-											className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+											className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105"
 										>
 											Зберегти
 										</button>
@@ -123,7 +123,7 @@ export default function NewsBoard({
 												setEditingId("");
 												setEditingAttachments([]);
 											}}
-											className="rounded-xl bg-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-800"
+											className="rounded-xl bg-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-800 transition-all duration-300 hover:bg-slate-300 hover:scale-105"
 										>
 											Скасувати
 										</button>
@@ -257,7 +257,7 @@ export default function NewsBoard({
 						) : null}
 						<button
 							onClick={publish}
-							className="rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white"
+							className="rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white transition-all duration-300 hover:bg-indigo-700 hover:scale-105 hover:shadow-lg"
 						>
 							Опублікувати
 						</button>

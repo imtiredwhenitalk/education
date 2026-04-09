@@ -5,10 +5,10 @@ import { api } from "./api/api";
 import AuthSection from "./auth/auth";
 import NewsBoard from "./news/news";
 import ProfilePage from "./profile/profile";
-import type { AdmissionApplication, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats, Theme } from "./types";
+import type { AdmissionApplication, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats } from "./types";
 
 type Tab = "home" | "news" | "diary" | "gradebook" | "admin" | "profile" | "about";
-type PublicPage = "landing" | "auth" | "news" | "admission" | "app";
+type PublicPage = "landing" | "auth" | "news" | "admission" | "app" | "quickinfo";
 
 type QuickInfoItem = {
   title: string;
@@ -31,12 +31,6 @@ type AdmissionFormState = {
   parentPhone: string;
   email: string;
   notes: string;
-};
-
-const themeClass: Record<Theme, string> = {
-  light: "bg-slate-100 text-slate-900",
-  dark: "bg-slate-950 text-slate-900",
-  ocean: "bg-cyan-950 text-cyan-900",
 };
 
 const defaultGradeForm: GradeFormState = {
@@ -288,7 +282,7 @@ export default function Page() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [publicNews, setPublicNews] = useState<NewsItem[]>([]);
   const [selectedPublicNewsId, setSelectedPublicNewsId] = useState("");
-  const [selectedQuickButton, setSelectedQuickButton] = useState(quickButtons[0]);
+  const [selectedQuickInfoPage, setSelectedQuickInfoPage] = useState<string>("");
   const [stats, setStats] = useState<Stats | null>(null);
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
   const [message, setMessage] = useState("");
@@ -680,12 +674,22 @@ export default function Page() {
     }
   };
 
-  const currentTheme = user?.theme || "light";
-  const selectedQuickInfo = quickInfoMap[selectedQuickButton];
+  const deleteUser = async (id: string) => {
+    try {
+      await api.deleteUser(id);
+      await refresh();
+      setMessage("Користувача видалено");
+      clearMessageLater();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не вдалося видалити користувача");
+      clearMessageLater();
+    }
+  };
+
   const selectedPublicNews = publicNews.find((item) => item.id === selectedPublicNewsId) || null;
 
   return (
-    <main className={`min-h-screen ${themeClass[currentTheme]} transition-colors`}>
+    <main className="min-h-screen bg-slate-100 text-slate-900 transition-all duration-500">
       <div className="mx-auto max-w-7xl p-4 md:p-8">
         <header className="mb-6 rounded-3xl border border-slate-200 bg-white/90 p-5 text-slate-900 shadow-panel backdrop-blur">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -702,19 +706,19 @@ export default function Page() {
                 <>
                   <button
                     onClick={() => setPublicPage("app")}
-                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white"
+                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700 hover:scale-105 hover:shadow-lg"
                   >
                     Кабінет
                   </button>
                   <button
                     onClick={() => setPublicPage("landing")}
-                    className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
+                    className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg"
                   >
                     Головна
                   </button>
                   <button
                     onClick={logout}
-                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-rose-700 hover:scale-105 hover:shadow-lg"
                   >
                     Вийти
                   </button>
@@ -727,7 +731,7 @@ export default function Page() {
               ) : (
                 <button
                   onClick={() => setPublicPage("auth")}
-                  className="rounded-full border border-slate-300 bg-white p-2 shadow transition hover:shadow-md"
+                  className="rounded-full border border-slate-300 bg-white p-2 shadow transition-all duration-300 hover:shadow-md hover:scale-110"
                   title="Сторінка входу і реєстрації"
                 >
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -760,8 +764,11 @@ export default function Page() {
               {quickButtons.map((label) => (
                 <button
                   key={label}
-                  onClick={() => setSelectedQuickButton(label)}
-                  className="rounded-xl border border-white/80 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white"
+                  onClick={() => {
+                    setSelectedQuickInfoPage(label);
+                    setPublicPage("quickinfo");
+                  }}
+                  className="rounded-xl border border-white/80 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white hover:scale-105 hover:shadow-lg"
                 >
                   {label}
                 </button>
@@ -773,13 +780,13 @@ export default function Page() {
                 onClick={() => {
                   setPublicPage("admission");
                 }}
-                className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-700"
+                className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-cyan-700 hover:scale-105 hover:shadow-lg"
               >
                 Подати заявку на вступ
               </button>
               <button
                 onClick={() => (user ? setPublicPage("app") : setPublicPage("auth"))}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
               >
                 {user ? "Повернутись в кабінет" : "Перейти в електронний щоденник"}
               </button>
@@ -788,23 +795,10 @@ export default function Page() {
                   setPublicPage("news");
                   setSelectedPublicNewsId("");
                 }}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-100"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-800 transition-all duration-300 hover:bg-slate-100 hover:scale-105 hover:shadow-lg"
               >
                 Переглянути всі новини
               </button>
-            </div>
-
-            <div className="relative mt-6 rounded-2xl border border-sky-200 bg-white/80 p-4 shadow-sm md:p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Детальна інформація розділу</p>
-              <h3 className="mt-2 text-xl font-black text-slate-900">{selectedQuickInfo.title}</h3>
-              <p className="mt-2 text-sm text-slate-700 md:text-base">{selectedQuickInfo.intro}</p>
-              <ul className="mt-3 grid gap-2 text-sm text-slate-700">
-                {selectedQuickInfo.details.map((point) => (
-                  <li key={point} className="rounded-lg bg-slate-50 px-3 py-2">
-                    {point}
-                  </li>
-                ))}
-              </ul>
             </div>
           </article>
           </section>
@@ -822,7 +816,7 @@ export default function Page() {
                   setPublicPage("news");
                   setSelectedPublicNewsId("");
                 }}
-                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700 hover:scale-105 hover:shadow-lg"
               >
                 Всі новини
               </button>
@@ -875,7 +869,7 @@ export default function Page() {
                         setSelectedPublicNewsId(item.id);
                         setPublicPage("news");
                       }}
-                      className="mt-3 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                      className="mt-3 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all duration-300 hover:bg-slate-100 hover:scale-105 hover:shadow-md"
                     >
                       Читати далі
                     </button>
@@ -925,7 +919,7 @@ export default function Page() {
                 </div>
                 <button
                   onClick={() => setPublicPage("landing")}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
                 >
                   Назад на головну
                 </button>
@@ -949,7 +943,7 @@ export default function Page() {
                 </div>
                 <button
                   onClick={() => setPublicPage("landing")}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
                 >
                   Назад на головну
                 </button>
@@ -1085,6 +1079,43 @@ export default function Page() {
           </section>
         ) : null}
 
+        {publicPage === "quickinfo" ? (
+          <section className="mb-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Інформація про ліцей</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">{selectedQuickInfoPage}</h2>
+                  <p className="text-sm text-slate-600">
+                    Детальна інформація про вибраний розділ ліцею.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPublicPage("landing")}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
+                >
+                  Назад на головну
+                </button>
+              </div>
+            </div>
+
+            <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="prose prose-slate max-w-none">
+                <h3 className="text-xl font-black text-slate-900">{quickInfoMap[selectedQuickInfoPage]?.title}</h3>
+                <p className="mt-2 text-slate-700">{quickInfoMap[selectedQuickInfoPage]?.intro}</p>
+                <ul className="mt-4 space-y-2">
+                  {quickInfoMap[selectedQuickInfoPage]?.details.map((point, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <div className="mt-1 h-2 w-2 rounded-full bg-sky-500 flex-shrink-0"></div>
+                      <span className="text-slate-700">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
         {publicPage === "admission" ? (
           <section className="mb-6 space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
@@ -1098,7 +1129,7 @@ export default function Page() {
                 </div>
                 <button
                   onClick={() => setPublicPage("landing")}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
                 >
                   Назад на головну
                 </button>
@@ -1171,7 +1202,7 @@ export default function Page() {
                       onClick={() =>
                         setAdmissionAttachments((prev) => prev.filter((item) => item.id !== file.id))
                       }
-                      className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                      className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 transition-all duration-300 hover:bg-slate-200 hover:scale-105"
                     >
                       {file.name} x
                     </button>
@@ -1182,7 +1213,7 @@ export default function Page() {
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   onClick={submitAdmissionForm}
-                  className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-700"
+                  className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-cyan-700 hover:scale-105 hover:shadow-lg"
                 >
                   Надіслати заявку
                 </button>
@@ -1191,7 +1222,7 @@ export default function Page() {
                     setAdmissionForm(defaultAdmissionForm);
                     setAdmissionAttachments([]);
                   }}
-                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-200"
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition-all duration-300 hover:bg-slate-200 hover:scale-105 hover:shadow-lg"
                 >
                   Очистити форму
                 </button>
@@ -1207,10 +1238,10 @@ export default function Page() {
                 <button
                   key={id}
                   onClick={() => safeSetTab(id)}
-                  className={`rounded-xl border px-4 py-2 text-sm font-semibold ${
+                  className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-all duration-300 hover:scale-105 ${
                     tab === id
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 bg-white/80 text-slate-900"
+                      ? "border-emerald-500 bg-emerald-500 text-white shadow-lg"
+                      : "border-slate-300 bg-white/80 text-slate-900 hover:bg-white hover:shadow-md"
                   }`}
                 >
                   {tabLabels[id]}
@@ -1220,20 +1251,20 @@ export default function Page() {
 
             {tab === "home" && stats ? (
               <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-xl hover:scale-105">
                   <p className="text-xs uppercase text-slate-500">Користувач</p>
                   <h3 className="mt-2 text-lg font-bold">{user.fullName}</h3>
                   <p className="text-slate-600">Роль: {user.role}</p>
                 </article>
-                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-xl hover:scale-105">
                   <p className="text-xs uppercase text-slate-500">Учні</p>
                   <h3 className="mt-2 text-3xl font-black">{stats.students}</h3>
                 </article>
-                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-xl hover:scale-105">
                   <p className="text-xs uppercase text-slate-500">Вчителі</p>
                   <h3 className="mt-2 text-3xl font-black">{stats.teachers}</h3>
                 </article>
-                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-xl hover:scale-105">
                   <p className="text-xs uppercase text-slate-500">Середній бал</p>
                   <h3 className="mt-2 text-3xl font-black">{stats.averageGrade}</h3>
                 </article>
@@ -1252,7 +1283,7 @@ export default function Page() {
             ) : null}
 
             {tab === "diary" ? (
-              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-lg">
                 <h2 className="mb-4 text-xl font-bold">Електронний щоденник</h2>
                 <div className="mb-4 grid gap-3 md:grid-cols-3">
                   <input
@@ -1323,7 +1354,7 @@ export default function Page() {
             ) : null}
 
             {tab === "gradebook" && (user.role === "teacher" || user.role === "admin") ? (
-              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel">
+              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-lg">
                 <h2 className="mb-4 text-xl font-bold">Журнал вчителя / модерація оцінок</h2>
 
                 {user.role === "teacher" ? (
@@ -1369,7 +1400,7 @@ export default function Page() {
                     </div>
                     <button
                       onClick={addGrade}
-                      className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white"
+                      className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105 hover:shadow-lg"
                     >
                       Додати оцінку
                     </button>
@@ -1468,13 +1499,13 @@ export default function Page() {
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       onClick={saveGrade}
-                                      className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-semibold text-white"
+                                      className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105"
                                     >
                                       Зберегти
                                     </button>
                                     <button
                                       onClick={() => setEditingGradeId("")}
-                                      className="rounded-xl bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-800"
+                                      className="rounded-xl bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-800 transition-all duration-300 hover:bg-slate-300 hover:scale-105"
                                     >
                                       Скасувати
                                     </button>
@@ -1490,13 +1521,13 @@ export default function Page() {
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       onClick={() => startEditGrade(row)}
-                                      className="rounded-xl bg-amber-500 px-2 py-1 text-xs font-semibold text-white"
+                                      className="rounded-xl bg-amber-500 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-amber-600 hover:scale-105"
                                     >
                                       Ред.
                                     </button>
                                     <button
                                       onClick={() => removeGrade(row.id)}
-                                      className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-semibold text-white"
+                                      className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-rose-700 hover:scale-105"
                                     >
                                       Вид.
                                     </button>
@@ -1514,7 +1545,7 @@ export default function Page() {
             ) : null}
 
             {tab === "admin" && user.role === "admin" ? (
-              <AdminPanel users={users} admissions={admissions} onUpdateAdmission={updateAdmissionStatus} />
+              <AdminPanel users={users} admissions={admissions} onUpdateAdmission={updateAdmissionStatus} onDeleteUser={deleteUser} user={user} />
             ) : null}
 
             {tab === "profile" ? <ProfilePage user={user} onSave={saveProfile} /> : null}

@@ -300,7 +300,7 @@ def update_me(payload: ProfileUpdatePayload, user: Dict[str, Any] = Depends(auth
     if index == -1:
         raise HTTPException(status_code=404, detail="User not found")
 
-    allowed_themes = {"light", "dark", "ocean"}
+    allowed_themes = {"light"}
     current = db["users"][index]
 
     if payload.fullName is not None:
@@ -341,6 +341,30 @@ def get_users(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
     return {"users": [public_user(u) for u in db["users"]]}
 
 
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
+    require_role(user, ["admin"])
+
+    db = read_db()
+    index = next((i for i, u in enumerate(db["users"]) if u["id"] == user_id), -1)
+    if index == -1:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Не дозволяємо видаляти самого себе
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    # Видаляємо всі пов'язані дані: оцінки, новини, заявки
+    db["grades"] = [g for g in db["grades"] if g["studentId"] != user_id and g["teacherId"] != user_id]
+    db["news"] = [n for n in db["news"] if n.get("ownerId") != user_id]
+    db["admissions"] = [a for a in db["admissions"] if a.get("linkedStudentId") != user_id]
+
+    # Видаляємо користувача
+    db["users"].pop(index)
+    write_db(db)
+    return {"ok": True}
+
+
 @app.post("/api/public/admissions")
 def create_admission(payload: AdmissionCreatePayload) -> Dict[str, Any]:
     if not payload.fullName.strip() or not payload.classGoal.strip() or not payload.email.strip():
@@ -379,41 +403,53 @@ def get_admissions(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
 
 @app.put("/api/admissions/{admission_id}")
 def update_admission(admission_id: str, payload: AdmissionUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    require_role(user, ["admin"])
-    db = read_db()
+    try:
+        require_role(user, ["admin"])
+        db = read_db()
 
-    index = next((i for i, x in enumerate(db["admissions"]) if x["id"] == admission_id), -1)
-    if index == -1:
-        raise HTTPException(status_code=404, detail="Admission not found")
+        index = next((i for i, x in enumerate(db["admissions"]) if x["id"] == admission_id), -1)
+        if index == -1:
+            raise HTTPException(status_code=404, detail="Admission not found")
 
-    admission = db["admissions"][index]
-    next_status = payload.status.strip().lower()
-    if next_status not in ["pending", "accepted", "rejected"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
+        admission = db["admissions"][index]
+        next_status = payload.status.strip().lower()
+        if next_status not in ["pending", "accepted", "rejected"]:
+            raise HTTPException(status_code=400, detail="Invalid status")
 
-    teacher_id = payload.assignedTeacherId
-    if next_status == "accepted":
-        if not teacher_id:
-            raise HTTPException(status_code=400, detail="Select teacher before accepting")
-        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
-        if not teacher:
-            raise HTTPException(status_code=404, detail="Teacher not found")
+        teacher_id = payload.assignedTeacherId
+        if next_status == "accepted":
+            if not teacher_id:
+                raise HTTPException(status_code=400, detail="Select teacher before accepting")
+            teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+            if not teacher:
+                raise HTTPException(status_code=404, detail="Teacher not found")
 
-        linked_student_id = upsert_student_from_admission(db, admission, teacher_id)
-        admission["linkedStudentId"] = linked_student_id
-        admission["assignedTeacherId"] = teacher_id
-    elif teacher_id:
-        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
-        if teacher:
+            linked_student_id = upsert_student_from_admission(db, admission, teacher_id)
+            admission["linkedStudentId"] = linked_student_id
             admission["assignedTeacherId"] = teacher_id
 
-    admission["status"] = next_status
-    admission["adminComment"] = (payload.adminComment or "").strip()
-    admission["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            # Повертаємо admission перед видаленням
+            result = {"admission": admission}
 
-    db["admissions"][index] = admission
-    write_db(db)
-    return {"admission": admission}
+            # Видаляємо заявку після прийняття
+            db["admissions"].pop(index)
+            write_db(db)
+            return result
+        elif teacher_id:
+            teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+            if teacher:
+                admission["assignedTeacherId"] = teacher_id
+
+        admission["status"] = next_status
+        admission["adminComment"] = (payload.adminComment or "").strip()
+        admission["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+        db["admissions"][index] = admission
+        write_db(db)
+        return {"admission": admission}
+    except Exception as e:
+        print("UPDATE_ADMISSION_ERROR:", repr(e))
+        raise
 
 
 @app.get("/api/news")
