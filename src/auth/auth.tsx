@@ -59,7 +59,7 @@ export default function AuthSection({ onRegister, onLogin, loading }: AuthSectio
 					/>
 					<input
 						className="rounded-lg border border-slate-300 px-3 py-2"
-						placeholder="Клас або кафедра"
+						placeholder="Клас"
 						value={className}
 						onChange={(e) => setClassName(e.target.value)}
 					/>

@@ -74,6 +74,23 @@ class GradeUpdatePayload(BaseModel):
     comment: str = ""
 
 
+class AdmissionCreatePayload(BaseModel):
+    fullName: str
+    studentBirthDate: str
+    classGoal: str
+    parentName: str
+    parentPhone: str
+    email: str
+    notes: str = ""
+    attachments: List[AttachmentPayload] = []
+
+
+class AdmissionUpdatePayload(BaseModel):
+    status: str
+    assignedTeacherId: Optional[str] = None
+    adminComment: Optional[str] = None
+
+
 app = FastAPI(title="School Portal Python API")
 
 app.add_middleware(
@@ -88,9 +105,20 @@ app.add_middleware(
 def read_db() -> Dict[str, Any]:
     with lock:
         if not DATA_FILE.exists():
-            return {"users": [], "grades": [], "news": []}
+            return {"users": [], "grades": [], "news": [], "admissions": []}
         with DATA_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            db = json.load(f)
+
+    if "users" not in db:
+        db["users"] = []
+    if "grades" not in db:
+        db["grades"] = []
+    if "news" not in db:
+        db["news"] = []
+    if "admissions" not in db:
+        db["admissions"] = []
+
+    return db
 
 
 def write_db(db: Dict[str, Any]) -> None:
@@ -141,6 +169,49 @@ def sanitize_attachments(items: List[AttachmentPayload]) -> List[Dict[str, str]]
             }
         )
     return clean
+
+
+def unique_student_email(db: Dict[str, Any], base_email: str, app_id: str) -> str:
+    requested = (base_email or "").strip().lower()
+    if requested and not any(u["email"] == requested for u in db["users"]):
+        return requested
+
+    fallback = f"admission-{app_id}@school.local"
+    if not any(u["email"] == fallback for u in db["users"]):
+        return fallback
+
+    index = 1
+    while True:
+        candidate = f"admission-{app_id}-{index}@school.local"
+        if not any(u["email"] == candidate for u in db["users"]):
+            return candidate
+        index += 1
+
+
+def upsert_student_from_admission(db: Dict[str, Any], admission: Dict[str, Any], assigned_teacher_id: str) -> str:
+    linked_id = admission.get("linkedStudentId")
+    current = next((u for u in db["users"] if u["id"] == linked_id and u["role"] == "student"), None)
+
+    if current:
+        current["fullName"] = admission["fullName"]
+        current["className"] = admission["classGoal"]
+        current["assignedTeacherId"] = assigned_teacher_id
+        return current["id"]
+
+    student = {
+        "id": uid("u"),
+        "email": unique_student_email(db, admission.get("studentEmail") or admission.get("email", ""), admission["id"]),
+        "passwordHash": pwd_context.hash(secrets.token_urlsafe(10)),
+        "fullName": admission["fullName"],
+        "className": admission["classGoal"],
+        "role": "student",
+        "avatarUrl": "https://i.pravatar.cc/120",
+        "bio": "Створено з заявки на вступ",
+        "theme": "light",
+        "assignedTeacherId": assigned_teacher_id,
+    }
+    db["users"].append(student)
+    return student["id"]
 
 
 def auth_user(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
@@ -253,7 +324,96 @@ def update_me(payload: ProfileUpdatePayload, user: Dict[str, Any] = Depends(auth
 def get_users(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
     require_role(user, ["admin", "teacher"])
     db = read_db()
+
+    if user["role"] == "teacher":
+        visible: List[Dict[str, Any]] = []
+        for row in db["users"]:
+            if row["id"] == user["id"]:
+                visible.append(row)
+                continue
+            if row.get("role") != "student":
+                continue
+            assigned = row.get("assignedTeacherId")
+            if not assigned or assigned == user["id"]:
+                visible.append(row)
+        return {"users": [public_user(u) for u in visible]}
+
     return {"users": [public_user(u) for u in db["users"]]}
+
+
+@app.post("/api/public/admissions")
+def create_admission(payload: AdmissionCreatePayload) -> Dict[str, Any]:
+    if not payload.fullName.strip() or not payload.classGoal.strip() or not payload.email.strip():
+        raise HTTPException(status_code=400, detail="Required fields are missing")
+
+    db = read_db()
+    row = {
+        "id": uid("adm"),
+        "fullName": payload.fullName.strip(),
+        "studentBirthDate": payload.studentBirthDate.strip(),
+        "classGoal": payload.classGoal.strip(),
+        "parentName": payload.parentName.strip(),
+        "parentPhone": payload.parentPhone.strip(),
+        "email": payload.email.strip().lower(),
+        "studentEmail": payload.email.strip().lower(),
+        "notes": payload.notes.strip(),
+        "status": "pending",
+        "assignedTeacherId": None,
+        "adminComment": "",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "attachments": sanitize_attachments(payload.attachments),
+    }
+    db["admissions"].insert(0, row)
+    write_db(db)
+    return {"admission": row}
+
+
+@app.get("/api/admissions")
+def get_admissions(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
+    require_role(user, ["admin"])
+    db = read_db()
+    rows = sorted(db["admissions"], key=lambda x: x.get("createdAt", ""), reverse=True)
+    return {"admissions": rows}
+
+
+@app.put("/api/admissions/{admission_id}")
+def update_admission(admission_id: str, payload: AdmissionUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
+    require_role(user, ["admin"])
+    db = read_db()
+
+    index = next((i for i, x in enumerate(db["admissions"]) if x["id"] == admission_id), -1)
+    if index == -1:
+        raise HTTPException(status_code=404, detail="Admission not found")
+
+    admission = db["admissions"][index]
+    next_status = payload.status.strip().lower()
+    if next_status not in ["pending", "accepted", "rejected"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    teacher_id = payload.assignedTeacherId
+    if next_status == "accepted":
+        if not teacher_id:
+            raise HTTPException(status_code=400, detail="Select teacher before accepting")
+        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+        if not teacher:
+            raise HTTPException(status_code=404, detail="Teacher not found")
+
+        linked_student_id = upsert_student_from_admission(db, admission, teacher_id)
+        admission["linkedStudentId"] = linked_student_id
+        admission["assignedTeacherId"] = teacher_id
+    elif teacher_id:
+        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+        if teacher:
+            admission["assignedTeacherId"] = teacher_id
+
+    admission["status"] = next_status
+    admission["adminComment"] = (payload.adminComment or "").strip()
+    admission["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+    db["admissions"][index] = admission
+    write_db(db)
+    return {"admission": admission}
 
 
 @app.get("/api/news")

@@ -7,6 +7,7 @@ export type SchoolUser = {
   fullName: string;
   className: string;
   role: Role;
+  assignedTeacherId?: string | null;
   avatarUrl: string;
   bio: string;
   theme: Theme;
@@ -38,6 +39,27 @@ export type NewsAttachment = {
   name: string;
   mimeType: string;
   dataUrl: string;
+};
+
+export type AdmissionStatus = "pending" | "accepted" | "rejected";
+
+export type AdmissionApplication = {
+  id: string;
+  fullName: string;
+  studentBirthDate: string;
+  classGoal: string;
+  parentName: string;
+  parentPhone: string;
+  email: string;
+  studentEmail?: string;
+  notes: string;
+  status: AdmissionStatus;
+  assignedTeacherId?: string | null;
+  linkedStudentId?: string;
+  adminComment?: string;
+  createdAt: string;
+  updatedAt?: string;
+  attachments?: NewsAttachment[];
 };
 
 export type Stats = {

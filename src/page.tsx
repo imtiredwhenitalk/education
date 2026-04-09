@@ -5,16 +5,32 @@ import { api } from "./api/api";
 import AuthSection from "./auth/auth";
 import NewsBoard from "./news/news";
 import ProfilePage from "./profile/profile";
-import type { GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats, Theme } from "./types";
+import type { AdmissionApplication, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats, Theme } from "./types";
 
 type Tab = "home" | "news" | "diary" | "gradebook" | "admin" | "profile" | "about";
-type PublicPage = "landing" | "auth";
+type PublicPage = "landing" | "auth" | "news" | "admission" | "app";
+
+type QuickInfoItem = {
+  title: string;
+  intro: string;
+  details: string[];
+};
 
 type GradeFormState = {
   studentId: string;
   subject: string;
   grade: number;
   comment: string;
+};
+
+type AdmissionFormState = {
+  fullName: string;
+  studentBirthDate: string;
+  classGoal: string;
+  parentName: string;
+  parentPhone: string;
+  email: string;
+  notes: string;
 };
 
 const themeClass: Record<Theme, string> = {
@@ -30,6 +46,16 @@ const defaultGradeForm: GradeFormState = {
   comment: "",
 };
 
+const defaultAdmissionForm: AdmissionFormState = {
+  fullName: "",
+  studentBirthDate: "",
+  classGoal: "",
+  parentName: "",
+  parentPhone: "",
+  email: "",
+  notes: "",
+};
+
 const tabLabels: Record<Tab, string> = {
   home: "Головна",
   news: "Новини",
@@ -40,31 +66,200 @@ const tabLabels: Record<Tab, string> = {
   about: "Про сайт",
 };
 
-const quickButtons = [
-  "Головна сторінка",
-  "Основна інформація",
-  "Про нас",
-  "Педагогічна рада",
-  "Виховна робота",
-  "Вступ 2026",
-  "Прийом учнів до 1-го класу",
-  "Розклад уроків",
-  "Освітні програми",
-  "ДПА / ЗНО",
-  "Внутрішня система якості освіти",
-  "Моніторинг якості освіти",
-  "Академічна доброчесність",
-  "Психологічна підтримка",
-  "Булінг: план дій",
-  "Інформаційна безпека",
-  "Атестація педагогічних працівників",
-  "Звіт директора",
-  "Кошторис",
-  "Учнівське самоврядування",
-  "Контакти",
-  "Електронний щоденник",
-  "Новини ліцею",
-];
+const quickInfoMap: Record<string, QuickInfoItem> = {
+  "Головна сторінка": {
+    title: "Головна сторінка",
+    intro: "Короткий огляд усіх ключових розділів порталу.",
+    details: [
+      "На головній розміщено швидкий доступ до вступу, новин, щоденника та контактів.",
+      "Оновлення по подіях і важливих оголошеннях з'являються одразу після публікації.",
+    ],
+  },
+  "Основна інформація": {
+    title: "Основна інформація",
+    intro: "Базові відомості про ліцей, структуру навчання та документи.",
+    details: [
+      "Форма навчання: очна та змішана (за потреби).",
+      "Профільні напрями: математичний, філологічний, ІТ-напрям.",
+      "Режим роботи, правила внутрішнього розпорядку, контакти адміністрації.",
+    ],
+  },
+  "Про нас": {
+    title: "Про нас",
+    intro: "Місія ліцею та освітні цінності.",
+    details: [
+      "Ліцей формує компетентності для навчання, кар'єри і життя в цифровому суспільстві.",
+      "Пріоритети: якість освіти, безпека, партнерство з батьками та розвиток учнів.",
+    ],
+  },
+  "Педагогічна рада": {
+    title: "Педагогічна рада",
+    intro: "Рішення та напрями розвитку освітнього процесу.",
+    details: [
+      "Розглядаються результати навчання, інноваційні методики та план підвищення кваліфікації.",
+      "Протоколи педради доступні адміністрації та педагогам у внутрішній частині порталу.",
+    ],
+  },
+  "Виховна робота": {
+    title: "Виховна робота",
+    intro: "Позаурочні ініціативи та громадянське виховання.",
+    details: [
+      "Працюють гуртки, тематичні тижні, волонтерські та спортивні активності.",
+      "Класні керівники публікують плани і звіти про виховні події.",
+    ],
+  },
+  "Вступ 2026": {
+    title: "Вступ 2026",
+    intro: "Інформація для вступників на 2026 навчальний рік.",
+    details: [
+      "Реєстрація заявок: з 1 березня до 15 червня 2026 року.",
+      "Пакет документів: заява, свідоцтво, медична довідка, паспорт одного з батьків.",
+      "Для профільних класів передбачено співбесіду або діагностичну роботу.",
+    ],
+  },
+  "Прийом учнів до 1-го класу": {
+    title: "Прийом до 1-го класу",
+    intro: "Календар подачі документів для майбутніх першокласників.",
+    details: [
+      "Прийом заяв триває відповідно до графіка, затвердженого закладом.",
+      "Першочергово зараховуються діти, які проживають на території обслуговування.",
+      "Результати зарахування публікуються на сайті та інформаційному стенді закладу.",
+    ],
+  },
+  "Розклад уроків": {
+    title: "Розклад уроків",
+    intro: "Актуальний розклад занять, факультативів та консультацій.",
+    details: [
+      "Оновлення публікуються щотижня або оперативно у випадку змін.",
+      "У профілі учня відображається персоналізований розклад класу.",
+    ],
+  },
+  "Освітні програми": {
+    title: "Освітні програми",
+    intro: "Опис навчальних програм, компетентностей і результатів.",
+    details: [
+      "Програми відповідають державному стандарту та профілю ліцею.",
+      "Публікуються навчальні плани, очікувані результати і критерії оцінювання.",
+    ],
+  },
+  "ДПА / ЗНО / НМТ": {
+    title: "ДПА, ЗНО, НМТ",
+    intro: "Підготовка до підсумкової атестації та вступних тестувань.",
+    details: [
+      "Розділ містить календар реєстрації на НМТ, пробні тести та важливі дедлайни.",
+      "Публікуються рекомендації з підготовки, матеріали минулих років і зміни процедур.",
+      "Для випускників доступні консультації з української, математики та історії України.",
+    ],
+  },
+  "Внутрішня система якості освіти": {
+    title: "Внутрішня система якості освіти",
+    intro: "Прозорі механізми оцінювання якості освітнього процесу.",
+    details: [
+      "Щорічно проводиться самооцінювання за напрямами: управління, навчання, безпека.",
+      "За підсумками формуються плани покращення та пріоритети розвитку закладу.",
+    ],
+  },
+  "Моніторинг якості освіти": {
+    title: "Моніторинг якості освіти",
+    intro: "Аналітика успішності та динаміки навчальних результатів.",
+    details: [
+      "Відстежуються середні бали по класах, предметах і паралелях.",
+      "Результати моніторингу допомагають вчасно коригувати навчальний процес.",
+    ],
+  },
+  "Академічна доброчесність": {
+    title: "Академічна доброчесність",
+    intro: "Політика чесного навчання та відповідального використання джерел.",
+    details: [
+      "Заборонено плагіат, списування, фабрикацію даних та несанкціоновану допомогу.",
+      "Учні і вчителі ознайомлюються з правилами цитування та етичної поведінки.",
+    ],
+  },
+  "Психологічна підтримка": {
+    title: "Психологічна підтримка",
+    intro: "Допомога учням, батькам і педагогам у складних ситуаціях.",
+    details: [
+      "Працюють індивідуальні консультації, групові заняття та профілактичні зустрічі.",
+      "Звернення до психолога конфіденційні та доступні за попереднім записом.",
+    ],
+  },
+  "Булінг: план дій": {
+    title: "Булінг: план дій",
+    intro: "Алгоритм дій у разі виявлення булінгу.",
+    details: [
+      "Негайно повідом класного керівника, психолога або адміністрацію.",
+      "Фіксуй факти та звертайся до відповідальних осіб для офіційного розгляду.",
+      "Ліцей забезпечує захист учасників освітнього процесу та супровід ситуації.",
+    ],
+  },
+  "Інформаційна безпека": {
+    title: "Інформаційна безпека",
+    intro: "Правила безпечної поведінки в інтернеті і захисту даних.",
+    details: [
+      "Використовуй складні паролі, не передавай персональні дані стороннім.",
+      "Офіційні оголошення публікуються лише через перевірені канали ліцею.",
+    ],
+  },
+  "Атестація педагогічних працівників": {
+    title: "Атестація педагогічних працівників",
+    intro: "План і критерії професійного оцінювання педагогів.",
+    details: [
+      "Проводиться згідно з чинним законодавством та внутрішнім графіком.",
+      "Результати враховують методичну діяльність, підвищення кваліфікації та успішність учнів.",
+    ],
+  },
+  "Звіт директора": {
+    title: "Звіт директора",
+    intro: "Публічний звіт про діяльність закладу за навчальний рік.",
+    details: [
+      "Охоплює результати навчання, фінанси, кадровий склад та стратегічні цілі.",
+      "Звіт презентується на відкритій зустрічі для батьківської і педагогічної спільноти.",
+    ],
+  },
+  Кошторис: {
+    title: "Кошторис",
+    intro: "Інформація про бюджет і використання коштів закладу.",
+    details: [
+      "Опубліковано основні статті витрат: обладнання, господарські потреби, розвиток інфраструктури.",
+      "Фінансова інформація оновлюється відповідно до звітних періодів.",
+    ],
+  },
+  "Учнівське самоврядування": {
+    title: "Учнівське самоврядування",
+    intro: "Ініціативи учнів та участь у шкільному житті.",
+    details: [
+      "Працює учнівська рада, яка пропонує та реалізує проєкти й події.",
+      "Учні беруть участь у прийнятті рішень щодо позакласної діяльності.",
+    ],
+  },
+  Контакти: {
+    title: "Контакти",
+    intro: "Канали зв'язку з адміністрацією та відповідальними особами.",
+    details: [
+      "Приймальня: +380 (33) 000-00-00.",
+      "Email: office@lyceum.edu.ua.",
+      "Адреса: м. Луцьк, вул. Шкільна, 10.",
+    ],
+  },
+  "Електронний щоденник": {
+    title: "Електронний щоденник",
+    intro: "Оцінки, домашні завдання та коментарі вчителів онлайн.",
+    details: [
+      "Після входу доступні поточні оцінки, історія успішності та зауваження.",
+      "Для батьків передбачено зручний моніторинг прогресу дитини.",
+    ],
+  },
+  "Новини ліцею": {
+    title: "Новини ліцею",
+    intro: "Оголошення, події та досягнення шкільної спільноти.",
+    details: [
+      "Публікуємо результати конкурсів, заходи, зустрічі та важливі повідомлення.",
+      "Кнопка \"Всі новини\" відкриває повний перелік новин із можливістю читати повний текст.",
+    ],
+  },
+};
+
+const quickButtons = Object.keys(quickInfoMap);
 
 const infoCards = [
   {
@@ -92,7 +287,10 @@ export default function Page() {
   const [grades, setGrades] = useState<GradeItem[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [publicNews, setPublicNews] = useState<NewsItem[]>([]);
+  const [selectedPublicNewsId, setSelectedPublicNewsId] = useState("");
+  const [selectedQuickButton, setSelectedQuickButton] = useState(quickButtons[0]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
   const [message, setMessage] = useState("");
   const [publicPage, setPublicPage] = useState<PublicPage>("landing");
 
@@ -109,6 +307,8 @@ export default function Page() {
   const [searchStudent, setSearchStudent] = useState("");
   const [filterClass, setFilterClass] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
+  const [admissionForm, setAdmissionForm] = useState<AdmissionFormState>(defaultAdmissionForm);
+  const [admissionAttachments, setAdmissionAttachments] = useState<NewsAttachment[]>([]);
 
   const clearMessageLater = () => {
     window.setTimeout(() => setMessage(""), 2600);
@@ -138,6 +338,13 @@ export default function Page() {
     } else {
       setUsers([profile]);
     }
+
+    if (profile.role === "admin") {
+      const admissionRows = await api.getAdmissions();
+      setAdmissions(admissionRows);
+    } else {
+      setAdmissions([]);
+    }
   };
 
   useEffect(() => {
@@ -149,6 +356,7 @@ export default function Page() {
 
     setLoading(true);
     refresh()
+      .then(() => setPublicPage("app"))
       .catch(() => {
         api.clearToken();
         setUser(null);
@@ -251,7 +459,8 @@ export default function Page() {
       setLoading(true);
       const me = await api.login(email, password);
       setUser(me);
-      setPublicPage("landing");
+      setTab("home");
+      setPublicPage("app");
       await refresh();
       setMessage(`Вітаю, ${me.fullName}`);
       clearMessageLater();
@@ -270,9 +479,44 @@ export default function Page() {
     setGrades([]);
     setNews([]);
     setStats(null);
+    setAdmissions([]);
     setPublicPage("landing");
     setTab("home");
     setEditingGradeId("");
+  };
+
+  const toAttachment = (file: File): Promise<NewsAttachment> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Invalid file"));
+          return;
+        }
+        resolve({
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          name: file.name,
+          mimeType: file.type || "application/octet-stream",
+          dataUrl: reader.result,
+        });
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  const onAdmissionFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const accepted = Array.from(files).filter((file) => {
+      const isImage = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf";
+      const isDoc =
+        file.type === "application/msword" ||
+        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      return isImage || isPdf || isDoc;
+    });
+
+    const prepared = await Promise.all(accepted.map((file) => toAttachment(file)));
+    setAdmissionAttachments((prev) => [...prev, ...prepared]);
   };
 
   const publishNews = async (title: string, body: string, attachments: NewsAttachment[]) => {
@@ -391,7 +635,54 @@ export default function Page() {
     }
   };
 
+  const submitAdmissionForm = async () => {
+    if (
+      !admissionForm.fullName ||
+      !admissionForm.studentBirthDate ||
+      !admissionForm.classGoal ||
+      !admissionForm.parentName ||
+      !admissionForm.parentPhone ||
+      !admissionForm.email
+    ) {
+      setMessage("Заповни обов'язкові поля заявки");
+      clearMessageLater();
+      return;
+    }
+
+    try {
+      await api.createAdmission({
+        ...admissionForm,
+        attachments: admissionAttachments,
+      });
+      setMessage("Заявку на вступ надіслано. Очікуй зворотного зв'язку від приймальної комісії.");
+      clearMessageLater();
+      setAdmissionForm(defaultAdmissionForm);
+      setAdmissionAttachments([]);
+      setPublicPage("landing");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не вдалося надіслати заявку");
+      clearMessageLater();
+    }
+  };
+
+  const updateAdmissionStatus = async (
+    id: string,
+    payload: { status: "pending" | "accepted" | "rejected"; assignedTeacherId?: string; adminComment?: string },
+  ) => {
+    try {
+      await api.updateAdmission(id, payload);
+      await refresh();
+      setMessage("Статус заявки оновлено");
+      clearMessageLater();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не вдалося оновити заявку");
+      clearMessageLater();
+    }
+  };
+
   const currentTheme = user?.theme || "light";
+  const selectedQuickInfo = quickInfoMap[selectedQuickButton];
+  const selectedPublicNews = publicNews.find((item) => item.id === selectedPublicNewsId) || null;
 
   return (
     <main className={`min-h-screen ${themeClass[currentTheme]} transition-colors`}>
@@ -409,6 +700,18 @@ export default function Page() {
             <div className="relative flex items-center gap-2">
               {user ? (
                 <>
+                  <button
+                    onClick={() => setPublicPage("app")}
+                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Кабінет
+                  </button>
+                  <button
+                    onClick={() => setPublicPage("landing")}
+                    className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Головна
+                  </button>
                   <button
                     onClick={logout}
                     className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
@@ -437,7 +740,7 @@ export default function Page() {
           </div>
         </header>
 
-        {!user && publicPage === "landing" ? (
+        {publicPage === "landing" ? (
           <section className="mb-6">
           <article className="relative overflow-hidden rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-100 via-white to-emerald-100 p-7 text-slate-900 shadow-panel">
             <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-cyan-300/50 blur-2xl" />
@@ -457,6 +760,7 @@ export default function Page() {
               {quickButtons.map((label) => (
                 <button
                   key={label}
+                  onClick={() => setSelectedQuickButton(label)}
                   className="rounded-xl border border-white/80 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   {label}
@@ -465,28 +769,61 @@ export default function Page() {
             </div>
 
             <div className="relative mt-6 flex flex-wrap gap-3">
-              <button className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-700">
+              <button
+                onClick={() => {
+                  setPublicPage("admission");
+                }}
+                className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-700"
+              >
                 Подати заявку на вступ
               </button>
-              <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
-                Перейти в електронний щоденник
+              <button
+                onClick={() => (user ? setPublicPage("app") : setPublicPage("auth"))}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                {user ? "Повернутись в кабінет" : "Перейти в електронний щоденник"}
               </button>
-              <button className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-100">
+              <button
+                onClick={() => {
+                  setPublicPage("news");
+                  setSelectedPublicNewsId("");
+                }}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-100"
+              >
                 Переглянути всі новини
               </button>
+            </div>
+
+            <div className="relative mt-6 rounded-2xl border border-sky-200 bg-white/80 p-4 shadow-sm md:p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Детальна інформація розділу</p>
+              <h3 className="mt-2 text-xl font-black text-slate-900">{selectedQuickInfo.title}</h3>
+              <p className="mt-2 text-sm text-slate-700 md:text-base">{selectedQuickInfo.intro}</p>
+              <ul className="mt-3 grid gap-2 text-sm text-slate-700">
+                {selectedQuickInfo.details.map((point) => (
+                  <li key={point} className="rounded-lg bg-slate-50 px-3 py-2">
+                    {point}
+                  </li>
+                ))}
+              </ul>
             </div>
           </article>
           </section>
         ) : null}
 
-        {!user && publicPage === "landing" ? (
+        {publicPage === "landing" ? (
           <section className="mb-6 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel backdrop-blur">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <h3 className="text-2xl font-black text-slate-900">Новини ліцею</h3>
                 <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">Події, оголошення та важлива інформація</p>
               </div>
-              <button className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700">
+              <button
+                onClick={() => {
+                  setPublicPage("news");
+                  setSelectedPublicNewsId("");
+                }}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+              >
                 Всі новини
               </button>
             </div>
@@ -500,7 +837,13 @@ export default function Page() {
                     </p>
                     <h4 className="mt-1 text-lg font-bold text-slate-900">{item.title}</h4>
                     <p className="mt-2 text-sm text-slate-600">{item.body.slice(0, 130)}...</p>
-                    <button className="mt-3 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100">
+                    <button
+                      onClick={() => {
+                        setSelectedPublicNewsId(item.id);
+                        setPublicPage("news");
+                      }}
+                      className="mt-3 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
                       Читати далі
                     </button>
                   </article>
@@ -518,7 +861,7 @@ export default function Page() {
           </div>
         ) : null}
 
-        {!user && publicPage === "landing" ? (
+        {publicPage === "landing" ? (
           <section className="mb-6 grid gap-4 md:grid-cols-3">
             {infoCards.map((card) => (
               <article
@@ -560,7 +903,193 @@ export default function Page() {
           </section>
         ) : null}
 
-        {user ? (
+        {publicPage === "news" ? (
+          <section className="mb-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Публічний розділ</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">Всі новини ліцею</h2>
+                  <p className="text-sm text-slate-600">
+                    Тут можна переглядати повні тексти новин, дати публікації та додані файли.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPublicPage("landing")}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Назад на головну
+                </button>
+              </div>
+            </div>
+
+            {selectedPublicNews ? (
+              <article className="rounded-2xl border border-cyan-200 bg-white/95 p-5 shadow-panel">
+                <p className="text-xs uppercase tracking-wider text-cyan-700">
+                  Обрана новина · {new Date(selectedPublicNews.createdAt).toLocaleDateString()}
+                </p>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">{selectedPublicNews.title}</h3>
+                <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700 md:text-base">
+                  {selectedPublicNews.body}
+                </p>
+                {selectedPublicNews.attachments?.length ? (
+                  <div className="mt-4 grid gap-2">
+                    {selectedPublicNews.attachments.map((file) => (
+                      <a
+                        key={file.id}
+                        href={file.dataUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-sky-700"
+                      >
+                        {file.name}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ) : null}
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {publicNews.length ? (
+                publicNews.map((item) => (
+                  <article key={item.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-panel">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </p>
+                    <h4 className="mt-1 text-lg font-bold text-slate-900">{item.title}</h4>
+                    <p className="mt-2 text-sm text-slate-600">{item.body.slice(0, 170)}...</p>
+                    <button
+                      onClick={() => setSelectedPublicNewsId(item.id)}
+                      className="mt-3 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
+                    >
+                      Відкрити новину
+                    </button>
+                  </article>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Поки новин немає.</p>
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {publicPage === "admission" ? (
+          <section className="mb-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Вступна кампанія</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">Заявка на вступ</h2>
+                  <p className="text-sm text-slate-600">
+                    Заповни форму нижче, і приймальна комісія зв'яжеться з тобою для уточнення деталей.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPublicPage("landing")}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Назад на головну
+                </button>
+              </div>
+            </div>
+
+            <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  placeholder="ПІБ дитини *"
+                  value={admissionForm.fullName}
+                  onChange={(e) => setAdmissionForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  type="date"
+                  value={admissionForm.studentBirthDate}
+                  onChange={(e) =>
+                    setAdmissionForm((prev) => ({ ...prev, studentBirthDate: e.target.value }))
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  placeholder="Клас вступу (наприклад: 1, 5, 10) *"
+                  value={admissionForm.classGoal}
+                  onChange={(e) => setAdmissionForm((prev) => ({ ...prev, classGoal: e.target.value }))}
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  placeholder="ПІБ одного з батьків *"
+                  value={admissionForm.parentName}
+                  onChange={(e) => setAdmissionForm((prev) => ({ ...prev, parentName: e.target.value }))}
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  placeholder="Телефон *"
+                  value={admissionForm.parentPhone}
+                  onChange={(e) => setAdmissionForm((prev) => ({ ...prev, parentPhone: e.target.value }))}
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                  type="email"
+                  placeholder="Email *"
+                  value={admissionForm.email}
+                  onChange={(e) => setAdmissionForm((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+
+              <textarea
+                className="mt-3 min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="Додаткова інформація (пільги, побажання, досягнення дитини)"
+                value={admissionForm.notes}
+                onChange={(e) => setAdmissionForm((prev) => ({ ...prev, notes: e.target.value }))}
+              />
+
+              <input
+                className="mt-3"
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={(e) => onAdmissionFiles(e.target.files)}
+              />
+
+              {admissionAttachments.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {admissionAttachments.map((file) => (
+                    <button
+                      key={file.id}
+                      onClick={() =>
+                        setAdmissionAttachments((prev) => prev.filter((item) => item.id !== file.id))
+                      }
+                      className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                    >
+                      {file.name} x
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={submitAdmissionForm}
+                  className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-cyan-700"
+                >
+                  Надіслати заявку
+                </button>
+                <button
+                  onClick={() => {
+                    setAdmissionForm(defaultAdmissionForm);
+                    setAdmissionAttachments([]);
+                  }}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-200"
+                >
+                  Очистити форму
+                </button>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {user && publicPage === "app" ? (
           <>
             <nav className="mb-6 flex flex-wrap gap-2">
               {allowedTabs.map((id) => (
@@ -873,7 +1402,9 @@ export default function Page() {
               </section>
             ) : null}
 
-            {tab === "admin" && user.role === "admin" ? <AdminPanel users={users} /> : null}
+            {tab === "admin" && user.role === "admin" ? (
+              <AdminPanel users={users} admissions={admissions} onUpdateAdmission={updateAdmissionStatus} />
+            ) : null}
 
             {tab === "profile" ? <ProfilePage user={user} onSave={saveProfile} /> : null}
 

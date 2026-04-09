@@ -1,4 +1,4 @@
-import type { GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats } from "../types";
+import type { AdmissionApplication, AdmissionStatus, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats } from "../types";
 
 const TOKEN_KEY = "school_token";
 
@@ -141,5 +141,36 @@ export const api = {
 	getStats: async () => {
 		const result = await request<{ stats: Stats }>("/api/dashboard");
 		return result.stats;
+	},
+
+	createAdmission: async (payload: {
+		fullName: string;
+		studentBirthDate: string;
+		classGoal: string;
+		parentName: string;
+		parentPhone: string;
+		email: string;
+		notes: string;
+		attachments: NewsAttachment[];
+	}) => {
+		return request<{ admission: AdmissionApplication }>("/api/public/admissions", {
+			method: "POST",
+			body: JSON.stringify(payload),
+		});
+	},
+
+	getAdmissions: async () => {
+		const result = await request<{ admissions: AdmissionApplication[] }>("/api/admissions");
+		return result.admissions;
+	},
+
+	updateAdmission: async (
+		id: string,
+		payload: { status: AdmissionStatus; assignedTeacherId?: string; adminComment?: string },
+	) => {
+		return request<{ admission: AdmissionApplication }>(`/api/admissions/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(payload),
+		});
 	},
 };
