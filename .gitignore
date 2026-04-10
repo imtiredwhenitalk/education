@@ -1,0 +1,16 @@
+node_modules
+dist
+backend/node_modules
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+venv/

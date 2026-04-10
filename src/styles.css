@@ -1,0 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Marck+Script&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --bg-soft: #f4f8ff;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 20% 0%, #e0f2fe 0%, #f8fafc 35%, #f1f5f9 100%);
+  min-height: 100vh;
+}
