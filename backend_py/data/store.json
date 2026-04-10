@@ -32,30 +32,9 @@
       "avatarUrl": "https://i.pravatar.cc/120?img=12",
       "bio": "Student",
       "theme": "light"
-    },
-    {
-      "id": "u-fa0c71c9de11",
-      "email": "3213",
-      "passwordHash": "$2b$12$PN0u4k1jhq0gK7adzd4eGu2jsko7FiQaIJNK85D6PFIaerhqsKvWy",
-      "fullName": "3213",
-      "className": "23",
-      "role": "student",
-      "avatarUrl": "https://i.pravatar.cc/120",
-      "bio": "Створено з заявки на вступ",
-      "theme": "light",
-      "assignedTeacherId": "u-teacher"
     }
   ],
   "grades": [
-    {
-      "id": "g-5ae573fb5bfd",
-      "studentId": "u-fa0c71c9de11",
-      "teacherId": "u-teacher",
-      "subject": "Географія",
-      "grade": 2,
-      "comment": "Ти даун",
-      "createdAt": "2026-04-10T20:07:50.631103+00:00"
-    },
     {
       "id": "g-1",
       "studentId": "u-student",
