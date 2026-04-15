@@ -1,4 +1,4 @@
-import type { AdmissionApplication, AdmissionStatus, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats } from "../types";
+import type { AdmissionApplication, AdmissionStatus, NewsAttachment, NewsItem, SchoolUser, Stats } from "../types";
 
 const TOKEN_KEY = "school_token";
 
@@ -110,36 +110,6 @@ export const api = {
 
 	deleteNews: async (id: string) => {
 		return request<{ ok: boolean }>(`/api/news/${id}`, {
-			method: "DELETE",
-		});
-	},
-
-	getGrades: async () => {
-		const result = await request<{ grades: GradeItem[] }>("/api/grades");
-		return result.grades;
-	},
-
-	createGrade: async (payload: {
-		studentId: string;
-		subject: string;
-		grade: number;
-		comment: string;
-	}) => {
-		return request<{ grade: GradeItem }>("/api/grades", {
-			method: "POST",
-			body: JSON.stringify(payload),
-		});
-	},
-
-	updateGrade: async (id: string, payload: { subject: string; grade: number; comment: string }) => {
-		return request<{ grade: GradeItem }>(`/api/grades/${id}`, {
-			method: "PUT",
-			body: JSON.stringify(payload),
-		});
-	},
-
-	deleteGrade: async (id: string) => {
-		return request<{ ok: boolean }>(`/api/grades/${id}`, {
 			method: "DELETE",
 		});
 	},

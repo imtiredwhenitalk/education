@@ -61,19 +61,6 @@ class NewsPayload(BaseModel):
     attachments: List[AttachmentPayload] = []
 
 
-class GradeCreatePayload(BaseModel):
-    studentId: str
-    subject: str
-    grade: int
-    comment: str = ""
-
-
-class GradeUpdatePayload(BaseModel):
-    subject: str
-    grade: int
-    comment: str = ""
-
-
 class AdmissionCreatePayload(BaseModel):
     fullName: str
     studentBirthDate: str
@@ -105,14 +92,12 @@ app.add_middleware(
 def read_db() -> Dict[str, Any]:
     with lock:
         if not DATA_FILE.exists():
-            return {"users": [], "grades": [], "news": [], "admissions": []}
+            return {"users": [], "news": [], "admissions": []}
         with DATA_FILE.open("r", encoding="utf-8") as f:
             db = json.load(f)
 
     if "users" not in db:
         db["users"] = []
-    if "grades" not in db:
-        db["grades"] = []
     if "news" not in db:
         db["news"] = []
     if "admissions" not in db:
@@ -354,8 +339,7 @@ def delete_user(user_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict
     if user_id == user["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
-    # Видаляємо всі пов'язані дані: оцінки, новини, заявки
-    db["grades"] = [g for g in db["grades"] if g["studentId"] != user_id and g["teacherId"] != user_id]
+    # Видаляємо всі пов'язані дані: новини, заявки
     db["news"] = [n for n in db["news"] if n.get("ownerId") != user_id]
     db["admissions"] = [a for a in db["admissions"] if a.get("linkedStudentId") != user_id]
 
@@ -523,116 +507,17 @@ def delete_news(news_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict
     return {"ok": True}
 
 
-@app.get("/api/grades")
-def get_grades(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    db = read_db()
-    grades = db["grades"]
-
-    if user["role"] == "student":
-        grades = [row for row in db["grades"] if row["studentId"] == user["id"]]
-    elif user["role"] == "teacher":
-        grades = [row for row in db["grades"] if row["teacherId"] == user["id"] or row["studentId"] == user["id"]]
-
-    return {"grades": grades}
-
-
-@app.post("/api/grades")
-def create_grade(payload: GradeCreatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    require_role(user, ["teacher"])
-
-    if payload.grade < 1 or payload.grade > 12:
-        raise HTTPException(status_code=400, detail="Invalid grade payload")
-
-    db = read_db()
-    student = next((u for u in db["users"] if u["id"] == payload.studentId and u["role"] == "student"), None)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-
-    row = {
-        "id": uid("g"),
-        "studentId": payload.studentId,
-        "teacherId": user["id"],
-        "subject": payload.subject.strip(),
-        "grade": payload.grade,
-        "comment": payload.comment.strip(),
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    }
-    db["grades"].insert(0, row)
-    write_db(db)
-    return {"grade": row}
-
-
-@app.put("/api/grades/{grade_id}")
-def update_grade(grade_id: str, payload: GradeUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    require_role(user, ["teacher", "admin"])
-
-    if payload.grade < 1 or payload.grade > 12:
-        raise HTTPException(status_code=400, detail="Invalid grade payload")
-
-    db = read_db()
-    index = next((i for i, x in enumerate(db["grades"]) if x["id"] == grade_id), -1)
-    if index == -1:
-        raise HTTPException(status_code=404, detail="Grade not found")
-
-    current = db["grades"][index]
-    can_edit = user["role"] == "admin" or current["teacherId"] == user["id"]
-    if not can_edit:
-        raise HTTPException(status_code=403, detail="You can edit only your own grades")
-
-    current["subject"] = payload.subject.strip()
-    current["grade"] = payload.grade
-    current["comment"] = payload.comment.strip()
-    current["updatedAt"] = datetime.now(timezone.utc).isoformat()
-    db["grades"][index] = current
-    write_db(db)
-
-    return {"grade": current}
-
-
-@app.delete("/api/grades/{grade_id}")
-def delete_grade(grade_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    require_role(user, ["teacher", "admin"])
-
-    db = read_db()
-    index = next((i for i, x in enumerate(db["grades"]) if x["id"] == grade_id), -1)
-    if index == -1:
-        raise HTTPException(status_code=404, detail="Grade not found")
-
-    current = db["grades"][index]
-    can_delete = user["role"] == "admin" or current["teacherId"] == user["id"]
-    if not can_delete:
-        raise HTTPException(status_code=403, detail="You can delete only your own grades")
-
-    db["grades"].pop(index)
-    write_db(db)
-    return {"ok": True}
-
-
 @app.get("/api/dashboard")
 def dashboard(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
     db = read_db()
     students = [u for u in db["users"] if u["role"] == "student"]
     teachers = [u for u in db["users"] if u["role"] == "teacher"]
 
-    avg = 0.0
-    if db["grades"]:
-        avg = sum(int(row["grade"]) for row in db["grades"]) / len(db["grades"])
-
-    if user["role"] == "student":
-        my_grades = [row for row in db["grades"] if row["studentId"] == user["id"]]
-    elif user["role"] == "teacher":
-        my_grades = [row for row in db["grades"] if row["teacherId"] == user["id"]]
-    else:
-        my_grades = db["grades"]
-
     return {
         "stats": {
             "users": len(db["users"]),
             "students": len(students),
             "teachers": len(teachers),
-            "grades": len(db["grades"]),
-            "averageGrade": round(avg, 2),
-            "myGradesCount": len(my_grades),
         }
     }
 

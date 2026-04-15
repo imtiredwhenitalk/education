@@ -4,8 +4,6 @@
 
 - реєстрацією учнів і вчителів
 - входом і ролями (student / teacher / admin)
-- виставленням оцінок вчителями
-- електронним щоденником
 - адмін-панеллю (інформаційна панель користувачів)
 - профілем (редагування даних, аватар, тема)
 - новинами школи
@@ -75,10 +73,6 @@ docker compose ps
 - `POST /api/news` (teacher/admin)
 - `PUT /api/news/:id` (teacher/admin)
 - `DELETE /api/news/:id` (teacher/admin)
-- `GET /api/grades`
-- `POST /api/grades` (teacher)
-- `PUT /api/grades/:id` (teacher/admin)
-- `DELETE /api/grades/:id` (teacher/admin)
 - `GET /api/dashboard`
 
 ## Структура

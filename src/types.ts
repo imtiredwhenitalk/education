@@ -13,16 +13,6 @@ export type SchoolUser = {
   theme: Theme;
 };
 
-export type GradeItem = {
-  id: string;
-  studentId: string;
-  teacherId: string;
-  subject: string;
-  grade: number;
-  comment: string;
-  createdAt: string;
-};
-
 export type NewsItem = {
   id: string;
   ownerId?: string;
@@ -66,7 +56,4 @@ export type Stats = {
   users: number;
   students: number;
   teachers: number;
-  grades: number;
-  averageGrade: number;
-  myGradesCount: number;
 };

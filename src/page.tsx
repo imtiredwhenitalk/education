@@ -5,22 +5,15 @@ import { api } from "./api/api";
 import AuthSection from "./auth/auth";
 import NewsBoard from "./news/news";
 import ProfilePage from "./profile/profile";
-import type { AdmissionApplication, GradeItem, NewsAttachment, NewsItem, SchoolUser, Stats } from "./types";
+import type { AdmissionApplication, NewsAttachment, NewsItem, SchoolUser, Stats } from "./types";
 
-type Tab = "home" | "news" | "diary" | "gradebook" | "admin" | "profile" | "about";
+type Tab = "home" | "news" | "admin" | "profile" | "about";
 type PublicPage = "landing" | "auth" | "news" | "admission" | "app" | "quickinfo";
 
 type QuickInfoItem = {
   title: string;
   intro: string;
   details: string[];
-};
-
-type GradeFormState = {
-  studentId: string;
-  subject: string;
-  grade: number;
-  comment: string;
 };
 
 type AdmissionFormState = {
@@ -31,13 +24,6 @@ type AdmissionFormState = {
   parentPhone: string;
   email: string;
   notes: string;
-};
-
-const defaultGradeForm: GradeFormState = {
-  studentId: "",
-  subject: "",
-  grade: 10,
-  comment: "",
 };
 
 const defaultAdmissionForm: AdmissionFormState = {
@@ -53,8 +39,6 @@ const defaultAdmissionForm: AdmissionFormState = {
 const tabLabels: Record<Tab, string> = {
   home: "Головна",
   news: "Новини",
-  diary: "Е-щоденник",
-  gradebook: "Журнал",
   admin: "Адмінка",
   profile: "Профіль",
   about: "Про сайт",
@@ -65,8 +49,8 @@ const quickInfoMap: Record<string, QuickInfoItem> = {
     title: "Головна сторінка",
     intro: "Короткий огляд усіх ключових розділів порталу.",
     details: [
-      "На головній розміщено швидкий доступ до вступу, новин, щоденника та контактів.",
-      "Оновлення по подіях і важливих оголошеннях з'являються одразу після публікації.",
+      "На головній розміщено швидкий доступ до вступу, новин та контактів.",
+      "Оновлення по подіям і важливих оголошеннях з'являються одразу після публікації.",
     ],
   },
   "Основна інформація": {
@@ -235,14 +219,6 @@ const quickInfoMap: Record<string, QuickInfoItem> = {
       "Адреса: м. Луцьк, вул. Шкільна, 10.",
     ],
   },
-  "Електронний щоденник": {
-    title: "Електронний щоденник",
-    intro: "Оцінки, домашні завдання та коментарі вчителів онлайн.",
-    details: [
-      "Після входу доступні поточні оцінки, історія успішності та зауваження.",
-      "Для батьків передбачено зручний моніторинг прогресу дитини.",
-    ],
-  },
   "Новини ліцею": {
     title: "Новини ліцею",
     intro: "Оголошення, події та досягнення шкільної спільноти.",
@@ -258,17 +234,17 @@ const quickButtons = Object.keys(quickInfoMap);
 const infoCards = [
   {
     title: "Для батьків",
-    text: "Оцінки, коментарі вчителів, новини класу, оголошення про збори та події.",
+    text: "Контакти з класними керівниками, оголошення про збори та важливі шкільні події.",
     accent: "from-cyan-500 to-sky-500",
   },
   {
     title: "Для учнів",
-    text: "Е-щоденник, прогрес по предметах, шкільні новини, індивідуальний профіль.",
+    text: "Доступ до навчальних ресурсів, новин школи та персонального профілю.",
     accent: "from-emerald-500 to-lime-500",
   },
   {
     title: "Для вчителів",
-    text: "Журнал оцінок, публікація новин, керування навчальною інформацією класів.",
+    text: "Публікація новин, керування навчальною інформацією та підтримка учнів.",
     accent: "from-blue-500 to-indigo-500",
   },
 ];
@@ -278,7 +254,6 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<SchoolUser | null>(null);
   const [users, setUsers] = useState<SchoolUser[]>([]);
-  const [grades, setGrades] = useState<GradeItem[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [publicNews, setPublicNews] = useState<NewsItem[]>([]);
   const [selectedPublicNewsId, setSelectedPublicNewsId] = useState("");
@@ -288,19 +263,7 @@ export default function Page() {
   const [message, setMessage] = useState("");
   const [publicPage, setPublicPage] = useState<PublicPage>("landing");
 
-  const [gradeForm, setGradeForm] = useState<GradeFormState>(defaultGradeForm);
-  const [editingGradeId, setEditingGradeId] = useState("");
-  const [editingGrade, setEditingGrade] = useState<{ subject: string; grade: number; comment: string }>(
-    {
-      subject: "",
-      grade: 10,
-      comment: "",
-    },
-  );
-
   const [searchStudent, setSearchStudent] = useState("");
-  const [filterClass, setFilterClass] = useState("all");
-  const [filterSubject, setFilterSubject] = useState("all");
   const [admissionForm, setAdmissionForm] = useState<AdmissionFormState>(defaultAdmissionForm);
   const [admissionAttachments, setAdmissionAttachments] = useState<NewsAttachment[]>([]);
 
@@ -314,15 +277,13 @@ export default function Page() {
   };
 
   const refresh = async () => {
-    const [profile, gradeRows, newsRows, dashboard] = await Promise.all([
+    const [profile, newsRows, dashboard] = await Promise.all([
       api.me(),
-      api.getGrades(),
       api.getNews(),
       api.getStats(),
     ]);
 
     setUser(profile);
-    setGrades(gradeRows);
     setNews(newsRows);
     setStats(dashboard);
 
@@ -360,8 +321,7 @@ export default function Page() {
 
   const allowedTabs = useMemo(() => {
     if (!user) return [] as Tab[];
-    const base: Tab[] = ["home", "news", "diary", "profile", "about"];
-    if (user.role === "teacher" || user.role === "admin") base.push("gradebook");
+    const base: Tab[] = ["home", "news", "profile", "about"];
     if (user.role === "admin") base.push("admin");
     return base;
   }, [user]);
@@ -391,41 +351,6 @@ export default function Page() {
     users.forEach((u) => map.set(u.id, u));
     return map;
   }, [users]);
-
-  const classOptions = useMemo(() => {
-    const values = students.map((s) => s.className);
-    return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-  }, [students]);
-
-  const subjectOptions = useMemo(() => {
-    const values = grades.map((g) => g.subject);
-    return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-  }, [grades]);
-
-  const filteredGrades = useMemo(() => {
-    const query = searchStudent.trim().toLowerCase();
-    return grades.filter((row) => {
-      const student = studentById.get(row.studentId);
-      const studentName = student?.fullName || "";
-      const studentClass = student?.className || "";
-
-      const bySubject = filterSubject === "all" || row.subject === filterSubject;
-      const byClass = filterClass === "all" || studentClass === filterClass;
-      const bySearch =
-        !query ||
-        studentName.toLowerCase().includes(query) ||
-        studentClass.toLowerCase().includes(query) ||
-        row.subject.toLowerCase().includes(query);
-
-      return bySubject && byClass && bySearch;
-    });
-  }, [grades, studentById, searchStudent, filterClass, filterSubject]);
-
-  const teacherManageGrades = useMemo(() => {
-    if (!user) return [];
-    if (user.role === "admin") return filteredGrades;
-    return filteredGrades.filter((g) => g.teacherId === user.id);
-  }, [filteredGrades, user]);
 
   const register = async (payload: {
     fullName: string;
@@ -470,13 +395,11 @@ export default function Page() {
     api.clearToken();
     setUser(null);
     setUsers([]);
-    setGrades([]);
     setNews([]);
     setStats(null);
     setAdmissions([]);
     setPublicPage("landing");
     setTab("home");
-    setEditingGradeId("");
   };
 
   const toAttachment = (file: File): Promise<NewsAttachment> =>
@@ -557,61 +480,6 @@ export default function Page() {
       clearMessageLater();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не вдалося видалити новину");
-      clearMessageLater();
-    }
-  };
-
-  const addGrade = async () => {
-    if (!gradeForm.studentId || !gradeForm.subject) {
-      setMessage("Обери учня і предмет");
-      clearMessageLater();
-      return;
-    }
-
-    try {
-      await api.createGrade(gradeForm);
-      await refresh();
-      setGradeForm(defaultGradeForm);
-      setMessage("Оцінку додано");
-      clearMessageLater();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Помилка додавання оцінки");
-      clearMessageLater();
-    }
-  };
-
-  const startEditGrade = (row: GradeItem) => {
-    setEditingGradeId(row.id);
-    setEditingGrade({
-      subject: row.subject,
-      grade: row.grade,
-      comment: row.comment,
-    });
-  };
-
-  const saveGrade = async () => {
-    if (!editingGradeId) return;
-
-    try {
-      await api.updateGrade(editingGradeId, editingGrade);
-      await refresh();
-      setEditingGradeId("");
-      setMessage("Оцінку оновлено");
-      clearMessageLater();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не вдалося оновити оцінку");
-      clearMessageLater();
-    }
-  };
-
-  const removeGrade = async (id: string) => {
-    try {
-      await api.deleteGrade(id);
-      await refresh();
-      setMessage("Оцінку видалено");
-      clearMessageLater();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не вдалося видалити оцінку");
       clearMessageLater();
     }
   };
@@ -697,8 +565,7 @@ export default function Page() {
               <p className="text-xs uppercase tracking-[0.25em] text-cyan-600">Офіційний вебпортал ліцею</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">School Portal</h1>
               <p className="text-sm text-slate-600 md:text-base">
-                Сучасний сайт школи з новинами, навчальними сервісами, електронним щоденником і
-                персональними кабінетами.
+                Сучасний сайт школи з новинами, навчальними сервісами і персональними кабінетами.
               </p>
             </div>
             <div className="relative flex items-center gap-2">
@@ -756,7 +623,7 @@ export default function Page() {
             </h2>
             <p className="relative mt-4 max-w-5xl text-sm leading-7 text-slate-700 md:text-base">
               Тут зібрана вся ключова інформація про заклад: освітні програми, вступ, правила,
-              новини, електронний щоденник, контакти, а також цифрові сервіси для учнів, вчителів
+              новини, контакти, а також цифрові сервіси для учнів, вчителів
               і батьків.
             </p>
 
@@ -788,7 +655,7 @@ export default function Page() {
                 onClick={() => (user ? setPublicPage("app") : setPublicPage("auth"))}
                 className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
               >
-                {user ? "Повернутись в кабінет" : "Перейти в електронний щоденник"}
+                {user ? "Повернутись в кабінет" : "Увійти до кабінету"}
               </button>
               <button
                 onClick={() => {
@@ -1264,10 +1131,6 @@ export default function Page() {
                   <p className="text-xs uppercase text-slate-500">Вчителі</p>
                   <h3 className="mt-2 text-3xl font-black">{stats.teachers}</h3>
                 </article>
-                <article className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-xl hover:scale-105">
-                  <p className="text-xs uppercase text-slate-500">Середній бал</p>
-                  <h3 className="mt-2 text-3xl font-black">{stats.averageGrade}</h3>
-                </article>
               </section>
             ) : null}
 
@@ -1280,268 +1143,6 @@ export default function Page() {
                 onUpdate={updateNews}
                 onDelete={deleteNews}
               />
-            ) : null}
-
-            {tab === "diary" ? (
-              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-lg">
-                <h2 className="mb-4 text-xl font-bold">Електронний щоденник</h2>
-                <div className="mb-4 grid gap-3 md:grid-cols-3">
-                  <input
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    placeholder="Пошук: учень, клас, предмет"
-                    value={searchStudent}
-                    onChange={(e) => setSearchStudent(e.target.value)}
-                  />
-                  <select
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    value={filterClass}
-                    onChange={(e) => setFilterClass(e.target.value)}
-                    disabled={user.role === "student"}
-                  >
-                    <option value="all">Всі класи</option>
-                    {classOptions.map((className) => (
-                      <option key={className} value={className}>
-                        {className}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    value={filterSubject}
-                    onChange={(e) => setFilterSubject(e.target.value)}
-                  >
-                    <option value="all">Всі предмети</option>
-                    {subjectOptions.map((subject) => (
-                      <option key={subject} value={subject}>
-                        {subject}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-300 text-left">
-                        <th className="py-2">Дата</th>
-                        {user.role !== "student" ? <th className="py-2">Учень</th> : null}
-                        <th className="py-2">Предмет</th>
-                        <th className="py-2">Оцінка</th>
-                        <th className="py-2">Коментар</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredGrades.map((row) => {
-                        const student = studentById.get(row.studentId);
-                        return (
-                          <tr key={row.id} className="border-b border-slate-200">
-                            <td className="py-2">{new Date(row.createdAt).toLocaleDateString()}</td>
-                            {user.role !== "student" ? (
-                              <td className="py-2">
-                                {student?.fullName || "-"} ({student?.className || "-"})
-                              </td>
-                            ) : null}
-                            <td className="py-2">{row.subject}</td>
-                            <td className="py-2 font-bold">{row.grade}</td>
-                            <td className="py-2">{row.comment || "-"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ) : null}
-
-            {tab === "gradebook" && (user.role === "teacher" || user.role === "admin") ? (
-              <section className="rounded-2xl border border-slate-300 bg-white/80 p-5 text-slate-900 shadow-panel transition-all duration-300 hover:shadow-lg">
-                <h2 className="mb-4 text-xl font-bold">Журнал вчителя / модерація оцінок</h2>
-
-                {user.role === "teacher" ? (
-                  <>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <select
-                        className="rounded-lg border border-slate-300 px-3 py-2"
-                        value={gradeForm.studentId}
-                        onChange={(e) => setGradeForm((prev) => ({ ...prev, studentId: e.target.value }))}
-                      >
-                        <option value="">Обери учня</option>
-                        {students.map((student) => (
-                          <option key={student.id} value={student.id}>
-                            {student.fullName} ({student.className})
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        className="rounded-lg border border-slate-300 px-3 py-2"
-                        placeholder="Предмет"
-                        value={gradeForm.subject}
-                        onChange={(e) => setGradeForm((prev) => ({ ...prev, subject: e.target.value }))}
-                      />
-
-                      <input
-                        className="rounded-lg border border-slate-300 px-3 py-2"
-                        type="number"
-                        min={1}
-                        max={12}
-                        value={gradeForm.grade}
-                        onChange={(e) =>
-                          setGradeForm((prev) => ({ ...prev, grade: Number(e.target.value) }))
-                        }
-                      />
-
-                      <input
-                        className="rounded-lg border border-slate-300 px-3 py-2"
-                        placeholder="Коментар"
-                        value={gradeForm.comment}
-                        onChange={(e) => setGradeForm((prev) => ({ ...prev, comment: e.target.value }))}
-                      />
-                    </div>
-                    <button
-                      onClick={addGrade}
-                      className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105 hover:shadow-lg"
-                    >
-                      Додати оцінку
-                    </button>
-                  </>
-                ) : null}
-
-                <div className="mt-6 mb-4 grid gap-3 md:grid-cols-3">
-                  <input
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    placeholder="Пошук: учень, клас, предмет"
-                    value={searchStudent}
-                    onChange={(e) => setSearchStudent(e.target.value)}
-                  />
-                  <select
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    value={filterClass}
-                    onChange={(e) => setFilterClass(e.target.value)}
-                  >
-                    <option value="all">Всі класи</option>
-                    {classOptions.map((className) => (
-                      <option key={className} value={className}>
-                        {className}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded-lg border border-slate-300 px-3 py-2"
-                    value={filterSubject}
-                    onChange={(e) => setFilterSubject(e.target.value)}
-                  >
-                    <option value="all">Всі предмети</option>
-                    {subjectOptions.map((subject) => (
-                      <option key={subject} value={subject}>
-                        {subject}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-300 text-left">
-                        <th className="py-2">Учень</th>
-                        <th className="py-2">Предмет</th>
-                        <th className="py-2">Оцінка</th>
-                        <th className="py-2">Коментар</th>
-                        <th className="py-2">Дії</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {teacherManageGrades.map((row) => {
-                        const student = studentById.get(row.studentId);
-                        const inEdit = editingGradeId === row.id;
-                        return (
-                          <tr key={row.id} className="border-b border-slate-200">
-                            <td className="py-2">
-                              {student?.fullName || "-"} ({student?.className || "-"})
-                            </td>
-                            {inEdit ? (
-                              <>
-                                <td className="py-2">
-                                  <input
-                                    className="w-full rounded-lg border border-slate-300 px-2 py-1"
-                                    value={editingGrade.subject}
-                                    onChange={(e) =>
-                                      setEditingGrade((prev) => ({ ...prev, subject: e.target.value }))
-                                    }
-                                  />
-                                </td>
-                                <td className="py-2">
-                                  <input
-                                    className="w-20 rounded-lg border border-slate-300 px-2 py-1"
-                                    type="number"
-                                    min={1}
-                                    max={12}
-                                    value={editingGrade.grade}
-                                    onChange={(e) =>
-                                      setEditingGrade((prev) => ({
-                                        ...prev,
-                                        grade: Number(e.target.value),
-                                      }))
-                                    }
-                                  />
-                                </td>
-                                <td className="py-2">
-                                  <input
-                                    className="w-full rounded-lg border border-slate-300 px-2 py-1"
-                                    value={editingGrade.comment}
-                                    onChange={(e) =>
-                                      setEditingGrade((prev) => ({ ...prev, comment: e.target.value }))
-                                    }
-                                  />
-                                </td>
-                                <td className="py-2">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      onClick={saveGrade}
-                                      className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-emerald-700 hover:scale-105"
-                                    >
-                                      Зберегти
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingGradeId("")}
-                                      className="rounded-xl bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-800 transition-all duration-300 hover:bg-slate-300 hover:scale-105"
-                                    >
-                                      Скасувати
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="py-2">{row.subject}</td>
-                                <td className="py-2 font-bold">{row.grade}</td>
-                                <td className="py-2">{row.comment || "-"}</td>
-                                <td className="py-2">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      onClick={() => startEditGrade(row)}
-                                      className="rounded-xl bg-amber-500 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-amber-600 hover:scale-105"
-                                    >
-                                      Ред.
-                                    </button>
-                                    <button
-                                      onClick={() => removeGrade(row.id)}
-                                      className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-rose-700 hover:scale-105"
-                                    >
-                                      Вид.
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
             ) : null}
 
             {tab === "admin" && user.role === "admin" ? (
