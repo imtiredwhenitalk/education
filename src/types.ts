@@ -31,6 +31,35 @@ export type NewsAttachment = {
   dataUrl: string;
 };
 
+export type QuickInfoItem = {
+  title: string;
+  intro: string;
+  details: string[];
+};
+
+export type InfoCard = {
+  title: string;
+  text: string;
+  accent: string;
+};
+
+export type SiteContent = {
+  headerKicker: string;
+  headerTitle: string;
+  headerSubtitle: string;
+  heroKicker: string;
+  heroTitle: string;
+  heroText: string;
+  ctaAdmission: string;
+  ctaCabinet: string;
+  ctaNews: string;
+  newsTitle: string;
+  newsSubtitle: string;
+  newsButtonText: string;
+  quickInfoMap: Record<string, QuickInfoItem>;
+  infoCards: InfoCard[];
+};
+
 export type AdmissionStatus = "pending" | "accepted" | "rejected";
 
 export type AdmissionApplication = {

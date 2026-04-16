@@ -5,16 +5,10 @@ import { api } from "./api/api";
 import AuthSection from "./auth/auth";
 import NewsBoard from "./news/news";
 import ProfilePage from "./profile/profile";
-import type { AdmissionApplication, NewsAttachment, NewsItem, SchoolUser, Stats } from "./types";
+import type { AdmissionApplication, NewsAttachment, NewsItem, QuickInfoItem, SchoolUser, SiteContent, Stats } from "./types";
 
 type Tab = "home" | "news" | "admin" | "profile" | "about";
 type PublicPage = "landing" | "auth" | "news" | "admission" | "app" | "quickinfo";
-
-type QuickInfoItem = {
-  title: string;
-  intro: string;
-  details: string[];
-};
 
 type AdmissionFormState = {
   fullName: string;
@@ -24,6 +18,14 @@ type AdmissionFormState = {
   parentPhone: string;
   email: string;
   notes: string;
+};
+
+type QuickInfoEditorRow = {
+  id: string;
+  label: string;
+  title: string;
+  intro: string;
+  detailsText: string;
 };
 
 const defaultAdmissionForm: AdmissionFormState = {
@@ -44,7 +46,7 @@ const tabLabels: Record<Tab, string> = {
   about: "Про сайт",
 };
 
-const quickInfoMap: Record<string, QuickInfoItem> = {
+const defaultQuickInfoMap: Record<string, QuickInfoItem> = {
   "Головна сторінка": {
     title: "Головна сторінка",
     intro: "Короткий огляд усіх ключових розділів порталу.",
@@ -229,9 +231,7 @@ const quickInfoMap: Record<string, QuickInfoItem> = {
   },
 };
 
-const quickButtons = Object.keys(quickInfoMap);
-
-const infoCards = [
+const defaultInfoCards = [
   {
     title: "Для батьків",
     text: "Контакти з класними керівниками, оголошення про збори та важливі шкільні події.",
@@ -249,6 +249,46 @@ const infoCards = [
   },
 ];
 
+const defaultSiteContent: SiteContent = {
+  headerKicker: "Офіційний вебпортал ліцею",
+  headerTitle: "School Portal",
+  headerSubtitle: "Сучасний сайт школи з новинами, навчальними сервісами і персональними кабінетами.",
+  heroKicker: "Головна сторінка школи",
+  heroTitle: "Луцький ліцей нового покоління: освіта, безпека, розвиток і технології в одному просторі",
+  heroText:
+    "Тут зібрана вся ключова інформація про заклад: освітні програми, вступ, правила, новини, контакти, а також цифрові сервіси для учнів, вчителів і батьків.",
+  ctaAdmission: "Подати заявку на вступ",
+  ctaCabinet: "Увійти до кабінету",
+  ctaNews: "Переглянути всі новини",
+  newsTitle: "Новини ліцею",
+  newsSubtitle: "Події, оголошення та важлива інформація",
+  newsButtonText: "Всі новини",
+  quickInfoMap: defaultQuickInfoMap,
+  infoCards: defaultInfoCards,
+};
+
+const normalizeSiteContent = (incoming: Partial<SiteContent> | null | undefined): SiteContent => {
+  if (!incoming || typeof incoming !== "object") {
+    return defaultSiteContent;
+  }
+
+  const map =
+    incoming.quickInfoMap && typeof incoming.quickInfoMap === "object"
+      ? (incoming.quickInfoMap as Record<string, QuickInfoItem>)
+      : defaultSiteContent.quickInfoMap;
+
+  const cards = Array.isArray(incoming.infoCards) && incoming.infoCards.length
+    ? incoming.infoCards
+    : defaultSiteContent.infoCards;
+
+  return {
+    ...defaultSiteContent,
+    ...incoming,
+    quickInfoMap: map,
+    infoCards: cards,
+  };
+};
+
 export default function Page() {
   const [tab, setTab] = useState<Tab>("home");
   const [loading, setLoading] = useState(false);
@@ -262,6 +302,14 @@ export default function Page() {
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
   const [message, setMessage] = useState("");
   const [publicPage, setPublicPage] = useState<PublicPage>("landing");
+  const [siteContent, setSiteContent] = useState<SiteContent>(defaultSiteContent);
+  const [isLandingEditorOpen, setIsLandingEditorOpen] = useState(false);
+  const [landingDraft, setLandingDraft] = useState<SiteContent>(defaultSiteContent);
+  const [quickInfoDraftRows, setQuickInfoDraftRows] = useState<QuickInfoEditorRow[]>([]);
+  const [landingEditorError, setLandingEditorError] = useState("");
+  const [landingSaving, setLandingSaving] = useState(false);
+  const [publicNewsQuery, setPublicNewsQuery] = useState("");
+  const [selectedPublicNewsImageIndex, setSelectedPublicNewsImageIndex] = useState(0);
 
   const [searchStudent, setSearchStudent] = useState("");
   const [admissionForm, setAdmissionForm] = useState<AdmissionFormState>(defaultAdmissionForm);
@@ -274,6 +322,11 @@ export default function Page() {
   const refreshPublicNews = async () => {
     const latest = await api.getPublicNews();
     setPublicNews(latest);
+  };
+
+  const refreshSiteContent = async () => {
+    const latest = await api.getPublicSiteContent();
+    setSiteContent(normalizeSiteContent(latest));
   };
 
   const refresh = async () => {
@@ -305,6 +358,10 @@ export default function Page() {
   useEffect(() => {
     refreshPublicNews().catch(() => {
       setPublicNews([]);
+    });
+
+    refreshSiteContent().catch(() => {
+      setSiteContent(defaultSiteContent);
     });
 
     if (!api.getSavedToken()) return;
@@ -554,7 +611,183 @@ export default function Page() {
     }
   };
 
+  const saveSiteContent = async (payload: SiteContent) => {
+    try {
+      const saved = await api.updateSiteContent(payload);
+      setSiteContent(normalizeSiteContent(saved));
+      setMessage("Контент головної сторінки збережено");
+      clearMessageLater();
+      return saved;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не вдалося зберегти контент головної");
+      clearMessageLater();
+      throw error;
+    }
+  };
+
+  const quickButtons = Object.keys(siteContent.quickInfoMap || {});
+
+  const toQuickInfoDraftRows = (map: Record<string, QuickInfoItem>): QuickInfoEditorRow[] =>
+    Object.entries(map).map(([label, item]) => ({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      label,
+      title: item.title,
+      intro: item.intro,
+      detailsText: item.details.join("\n"),
+    }));
+
+  useEffect(() => {
+    if (isLandingEditorOpen) return;
+    const normalized = normalizeSiteContent(siteContent);
+    setLandingDraft(normalized);
+    setQuickInfoDraftRows(toQuickInfoDraftRows(normalized.quickInfoMap));
+  }, [siteContent, isLandingEditorOpen]);
+
+  const openLandingEditor = () => {
+    const normalized = normalizeSiteContent(siteContent);
+    setLandingDraft(normalized);
+    setQuickInfoDraftRows(toQuickInfoDraftRows(normalized.quickInfoMap));
+    setLandingEditorError("");
+    setIsLandingEditorOpen(true);
+  };
+
+  const updateLandingField = (key: keyof SiteContent, value: string) => {
+    setLandingDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateInfoCard = (index: number, key: "title" | "text" | "accent", value: string) => {
+    setLandingDraft((prev) => ({
+      ...prev,
+      infoCards: prev.infoCards.map((card, cardIndex) => (cardIndex === index ? { ...card, [key]: value } : card)),
+    }));
+  };
+
+  const addInfoCard = () => {
+    setLandingDraft((prev) => ({
+      ...prev,
+      infoCards: [
+        ...prev.infoCards,
+        {
+          title: "Нова картка",
+          text: "Текст картки",
+          accent: "from-sky-500 to-cyan-500",
+        },
+      ],
+    }));
+  };
+
+  const removeInfoCard = (index: number) => {
+    setLandingDraft((prev) => ({
+      ...prev,
+      infoCards: prev.infoCards.filter((_, cardIndex) => cardIndex !== index),
+    }));
+  };
+
+  const updateQuickInfoRow = (id: string, patch: Partial<QuickInfoEditorRow>) => {
+    setQuickInfoDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const addQuickInfoRow = () => {
+    setQuickInfoDraftRows((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        label: "Новий розділ",
+        title: "Новий розділ",
+        intro: "Короткий опис",
+        detailsText: "Пункт 1",
+      },
+    ]);
+  };
+
+  const removeQuickInfoRow = (id: string) => {
+    setQuickInfoDraftRows((prev) => prev.filter((row) => row.id !== id));
+  };
+
+  const saveLandingEditor = async () => {
+    setLandingEditorError("");
+
+    const normalizedRows = quickInfoDraftRows
+      .map((row) => ({ ...row, label: row.label.trim(), title: row.title.trim(), intro: row.intro.trim() }))
+      .filter((row) => row.label);
+
+    const uniqueLabels = new Set(normalizedRows.map((row) => row.label));
+    if (!normalizedRows.length) {
+      setLandingEditorError("Додай хоча б один розділ швидкої інформації.");
+      return;
+    }
+    if (uniqueLabels.size !== normalizedRows.length) {
+      setLandingEditorError("Назви швидких розділів мають бути унікальні.");
+      return;
+    }
+
+    const quickInfoMap: Record<string, QuickInfoItem> = {};
+    normalizedRows.forEach((row) => {
+      quickInfoMap[row.label] = {
+        title: row.title || row.label,
+        intro: row.intro,
+        details: row.detailsText
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+      };
+    });
+
+    const nextCards = landingDraft.infoCards
+      .map((card) => ({
+        title: card.title.trim(),
+        text: card.text.trim(),
+        accent: card.accent.trim() || "from-sky-500 to-cyan-500",
+      }))
+      .filter((card) => card.title && card.text);
+
+    if (!nextCards.length) {
+      setLandingEditorError("Додай хоча б одну інформаційну картку.");
+      return;
+    }
+
+    const payload = normalizeSiteContent({
+      ...landingDraft,
+      quickInfoMap,
+      infoCards: nextCards,
+    });
+
+    setLandingSaving(true);
+    try {
+      await saveSiteContent(payload);
+      setIsLandingEditorOpen(false);
+    } catch {
+      setLandingEditorError("Помилка збереження. Спробуй ще раз.");
+    } finally {
+      setLandingSaving(false);
+    }
+  };
+
   const selectedPublicNews = publicNews.find((item) => item.id === selectedPublicNewsId) || null;
+
+  const latestPublicNews = useMemo(() => {
+    return [...publicNews]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 6);
+  }, [publicNews]);
+
+  const filteredPublicNews = useMemo(() => {
+    const query = publicNewsQuery.trim().toLowerCase();
+    if (!query) return publicNews;
+
+    return publicNews.filter((item) => {
+      const byTitle = item.title.toLowerCase().includes(query);
+      const dateUa = new Date(item.createdAt).toLocaleDateString("uk-UA").toLowerCase();
+      const dateIso = item.createdAt.slice(0, 10).toLowerCase();
+      return byTitle || dateUa.includes(query) || dateIso.includes(query);
+    });
+  }, [publicNews, publicNewsQuery]);
+
+  const selectedPublicNewsImages = selectedPublicNews?.attachments?.filter((file) => file.mimeType.startsWith("image/")) || [];
+
+  useEffect(() => {
+    setSelectedPublicNewsImageIndex(0);
+  }, [selectedPublicNewsId]);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 transition-all duration-500">
@@ -562,10 +795,10 @@ export default function Page() {
         <header className="mb-6 rounded-3xl border border-slate-200 bg-white/90 p-5 text-slate-900 shadow-panel backdrop-blur">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-cyan-600">Офіційний вебпортал ліцею</p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">School Portal</h1>
+              <p className="text-xs uppercase tracking-[0.25em] text-cyan-600">{siteContent.headerKicker}</p>
+              <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">{siteContent.headerTitle}</h1>
               <p className="text-sm text-slate-600 md:text-base">
-                Сучасний сайт школи з новинами, навчальними сервісами і персональними кабінетами.
+                {siteContent.headerSubtitle}
               </p>
             </div>
             <div className="relative flex items-center gap-2">
@@ -617,14 +850,12 @@ export default function Page() {
             <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-cyan-300/50 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-10 left-10 h-40 w-40 rounded-full bg-emerald-300/50 blur-2xl" />
 
-            <p className="relative text-xs uppercase tracking-[0.2em] text-sky-700">Головна сторінка школи</p>
+            <p className="relative text-xs uppercase tracking-[0.2em] text-sky-700">{siteContent.heroKicker}</p>
             <h2 className="relative mt-2 max-w-3xl text-3xl font-black leading-tight md:text-4xl">
-              Луцький ліцей нового покоління: освіта, безпека, розвиток і технології в одному просторі
+              {siteContent.heroTitle}
             </h2>
             <p className="relative mt-4 max-w-5xl text-sm leading-7 text-slate-700 md:text-base">
-              Тут зібрана вся ключова інформація про заклад: освітні програми, вступ, правила,
-              новини, контакти, а також цифрові сервіси для учнів, вчителів
-              і батьків.
+              {siteContent.heroText}
             </p>
 
             <div className="relative mt-5 flex flex-wrap gap-2">
@@ -649,13 +880,13 @@ export default function Page() {
                 }}
                 className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-cyan-700 hover:scale-105 hover:shadow-lg"
               >
-                Подати заявку на вступ
+                {siteContent.ctaAdmission}
               </button>
               <button
                 onClick={() => (user ? setPublicPage("app") : setPublicPage("auth"))}
                 className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
               >
-                {user ? "Повернутись в кабінет" : "Увійти до кабінету"}
+                {user ? "Повернутись в кабінет" : siteContent.ctaCabinet}
               </button>
               <button
                 onClick={() => {
@@ -664,19 +895,120 @@ export default function Page() {
                 }}
                 className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-800 transition-all duration-300 hover:bg-slate-100 hover:scale-105 hover:shadow-lg"
               >
-                Переглянути всі новини
+                {siteContent.ctaNews}
               </button>
             </div>
           </article>
           </section>
         ) : null}
 
+        {user?.role === "admin" && publicPage === "landing" ? (
+          <button
+            onClick={openLandingEditor}
+            className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl transition-all duration-300 hover:scale-105 hover:bg-slate-800"
+            title="Редагувати головну сторінку"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 20h4l10-10a2.1 2.1 0 0 0-4-1.4L4 18v2z" stroke="currentColor" strokeWidth="1.8" />
+              <path d="m12.5 6.5 5 5" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+            Змінити головну
+          </button>
+        ) : null}
+
+        {isLandingEditorOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3">
+            <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl md:p-6">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">Редактор головної сторінки</h2>
+                  <p className="text-sm text-slate-600">Просто зміни поля і натисни зберегти.</p>
+                </div>
+                <button
+                  onClick={() => setIsLandingEditorOpen(false)}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                >
+                  Закрити
+                </button>
+              </div>
+
+              <section className="grid gap-3 md:grid-cols-2">
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.headerKicker} onChange={(e) => updateLandingField("headerKicker", e.target.value)} placeholder="Підпис у шапці" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.headerTitle} onChange={(e) => updateLandingField("headerTitle", e.target.value)} placeholder="Заголовок сайту" />
+                <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={2} value={landingDraft.headerSubtitle} onChange={(e) => updateLandingField("headerSubtitle", e.target.value)} placeholder="Опис у шапці" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.heroKicker} onChange={(e) => updateLandingField("heroKicker", e.target.value)} placeholder="Підпис hero" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.heroTitle} onChange={(e) => updateLandingField("heroTitle", e.target.value)} placeholder="Головний заголовок" />
+                <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={3} value={landingDraft.heroText} onChange={(e) => updateLandingField("heroText", e.target.value)} placeholder="Опис hero" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.ctaAdmission} onChange={(e) => updateLandingField("ctaAdmission", e.target.value)} placeholder="Текст кнопки вступу" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.ctaCabinet} onChange={(e) => updateLandingField("ctaCabinet", e.target.value)} placeholder="Текст кнопки кабінету" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.ctaNews} onChange={(e) => updateLandingField("ctaNews", e.target.value)} placeholder="Текст кнопки новин" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.newsTitle} onChange={(e) => updateLandingField("newsTitle", e.target.value)} placeholder="Заголовок блоку новин" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.newsSubtitle} onChange={(e) => updateLandingField("newsSubtitle", e.target.value)} placeholder="Підзаголовок блоку новин" />
+                <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.newsButtonText} onChange={(e) => updateLandingField("newsButtonText", e.target.value)} placeholder="Текст кнопки новин" />
+              </section>
+
+              <section className="mt-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">Інформаційні картки</h3>
+                  <button onClick={addInfoCard} className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white">Додати картку</button>
+                </div>
+                {landingDraft.infoCards.map((card, index) => (
+                  <article key={`${card.title}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <input className="rounded-lg border border-slate-300 px-3 py-2" value={card.title} onChange={(e) => updateInfoCard(index, "title", e.target.value)} placeholder="Заголовок картки" />
+                      <input className="rounded-lg border border-slate-300 px-3 py-2" value={card.accent} onChange={(e) => updateInfoCard(index, "accent", e.target.value)} placeholder="Градієнт tailwind (наприклад from-sky-500 to-cyan-500)" />
+                      <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={2} value={card.text} onChange={(e) => updateInfoCard(index, "text", e.target.value)} placeholder="Текст картки" />
+                    </div>
+                    <button onClick={() => removeInfoCard(index)} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Видалити</button>
+                  </article>
+                ))}
+              </section>
+
+              <section className="mt-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">Розділи швидкої інформації</h3>
+                  <button onClick={addQuickInfoRow} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">Додати розділ</button>
+                </div>
+                {quickInfoDraftRows.map((row) => (
+                  <article key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <input className="rounded-lg border border-slate-300 px-3 py-2" value={row.label} onChange={(e) => updateQuickInfoRow(row.id, { label: e.target.value })} placeholder="Назва кнопки/розділу" />
+                      <input className="rounded-lg border border-slate-300 px-3 py-2" value={row.title} onChange={(e) => updateQuickInfoRow(row.id, { title: e.target.value })} placeholder="Заголовок сторінки" />
+                      <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={2} value={row.intro} onChange={(e) => updateQuickInfoRow(row.id, { intro: e.target.value })} placeholder="Короткий вступ" />
+                      <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={4} value={row.detailsText} onChange={(e) => updateQuickInfoRow(row.id, { detailsText: e.target.value })} placeholder="Пункти списку (кожен з нового рядка)" />
+                    </div>
+                    <button onClick={() => removeQuickInfoRow(row.id)} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Видалити</button>
+                  </article>
+                ))}
+              </section>
+
+              {landingEditorError ? <p className="mt-4 text-sm font-semibold text-rose-600">{landingEditorError}</p> : null}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={saveLandingEditor}
+                  disabled={landingSaving}
+                  className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700 disabled:opacity-60"
+                >
+                  {landingSaving ? "Збереження..." : "Зберегти зміни"}
+                </button>
+                <button
+                  onClick={() => setIsLandingEditorOpen(false)}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                >
+                  Скасувати
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {publicPage === "landing" ? (
           <section className="mb-6 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel backdrop-blur">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">Новини ліцею</h3>
-                <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">Події, оголошення та важлива інформація</p>
+                <h3 className="text-2xl font-black text-slate-900">{siteContent.newsTitle}</h3>
+                <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">{siteContent.newsSubtitle}</p>
               </div>
               <button
                 onClick={() => {
@@ -685,13 +1017,13 @@ export default function Page() {
                 }}
                 className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700 hover:scale-105 hover:shadow-lg"
               >
-                Всі новини
+                {siteContent.newsButtonText}
               </button>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {publicNews.length ? (
-                publicNews.slice(0, 6).map((item) => (
+              {latestPublicNews.length ? (
+                latestPublicNews.map((item) => (
                   <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs uppercase tracking-wide text-slate-500">
                       {new Date(item.createdAt).toLocaleDateString()}
@@ -757,7 +1089,7 @@ export default function Page() {
 
         {publicPage === "landing" ? (
           <section className="mb-6 grid gap-4 md:grid-cols-3">
-            {infoCards.map((card) => (
+            {siteContent.infoCards.map((card) => (
               <article
                 key={card.title}
                 className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel backdrop-blur"
@@ -790,6 +1122,15 @@ export default function Page() {
                 >
                   Назад на головну
                 </button>
+              </div>
+
+              <div className="mt-3">
+                <input
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Пошук новин за назвою або датою (наприклад: 16.04.2026 або 2026-04-16)"
+                  value={publicNewsQuery}
+                  onChange={(e) => setPublicNewsQuery(e.target.value)}
+                />
               </div>
             </div>
 
@@ -828,20 +1169,65 @@ export default function Page() {
                 </p>
                 {selectedPublicNews.attachments?.length ? (
                   <div className="mt-4 space-y-3">
-                    <div className="grid gap-3">
-                      {selectedPublicNews.attachments
-                        .filter((file) => file.mimeType.startsWith("image/"))
-                        .map((file) => (
-                          <figure key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    {selectedPublicNewsImages.length ? (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Фото ({selectedPublicNewsImages.length})
+                        </p>
+                        <div className="space-y-2">
+                          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
                             <img
-                              src={file.dataUrl}
-                              alt={file.name}
-                              className="max-h-[80vh] w-full rounded-lg object-contain"
+                              src={selectedPublicNewsImages[selectedPublicNewsImageIndex]?.dataUrl}
+                              alt="Фото новини"
+                              className="h-[55vh] max-h-[78vh] w-full rounded-lg bg-slate-100 object-contain"
                             />
-                            <figcaption className="mt-2 text-xs font-semibold text-slate-600">{file.name}</figcaption>
-                          </figure>
-                        ))}
-                    </div>
+                            {selectedPublicNewsImages.length > 1 ? (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setSelectedPublicNewsImageIndex((index) =>
+                                      (index - 1 + selectedPublicNewsImages.length) % selectedPublicNewsImages.length,
+                                    )
+                                  }
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+                                  aria-label="Попереднє фото"
+                                >
+                                  ‹
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setSelectedPublicNewsImageIndex((index) =>
+                                      (index + 1) % selectedPublicNewsImages.length,
+                                    )
+                                  }
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+                                  aria-label="Наступне фото"
+                                >
+                                  ›
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+
+                          {selectedPublicNewsImages.length > 1 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {selectedPublicNewsImages.map((file, index) => (
+                                <button
+                                  key={file.id}
+                                  onClick={() => setSelectedPublicNewsImageIndex(index)}
+                                  className={`shrink-0 overflow-hidden rounded-lg border-2 ${
+                                    index === selectedPublicNewsImageIndex ? "border-sky-500" : "border-transparent"
+                                  }`}
+                                  aria-label={`Фото ${index + 1}`}
+                                >
+                                  <img src={file.dataUrl} alt="Мініатюра" className="h-16 w-24 object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="space-y-3">
                       {selectedPublicNews.attachments
@@ -890,8 +1276,8 @@ export default function Page() {
             ) : null}
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {publicNews.length ? (
-                publicNews.map((item) => (
+              {filteredPublicNews.length ? (
+                filteredPublicNews.map((item) => (
                   <article key={item.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-panel">
                     <p className="text-xs uppercase tracking-wide text-slate-500">
                       {new Date(item.createdAt).toLocaleDateString()}
@@ -940,7 +1326,9 @@ export default function Page() {
                   </article>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">Поки новин немає.</p>
+                <p className="text-sm text-slate-500">
+                  {publicNewsQuery.trim() ? "Нічого не знайдено за цим запитом." : "Поки новин немає."}
+                </p>
               )}
             </div>
           </section>
@@ -968,10 +1356,10 @@ export default function Page() {
 
             <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
               <div className="prose prose-slate max-w-none">
-                <h3 className="text-xl font-black text-slate-900">{quickInfoMap[selectedQuickInfoPage]?.title}</h3>
-                <p className="mt-2 text-slate-700">{quickInfoMap[selectedQuickInfoPage]?.intro}</p>
+                <h3 className="text-xl font-black text-slate-900">{siteContent.quickInfoMap[selectedQuickInfoPage]?.title}</h3>
+                <p className="mt-2 text-slate-700">{siteContent.quickInfoMap[selectedQuickInfoPage]?.intro}</p>
                 <ul className="mt-4 space-y-2">
-                  {quickInfoMap[selectedQuickInfoPage]?.details.map((point, index) => (
+                  {siteContent.quickInfoMap[selectedQuickInfoPage]?.details?.map((point, index) => (
                     <li key={index} className="flex items-start gap-3">
                       <div className="mt-1 h-2 w-2 rounded-full bg-sky-500 flex-shrink-0"></div>
                       <span className="text-slate-700">{point}</span>
@@ -1146,7 +1534,15 @@ export default function Page() {
             ) : null}
 
             {tab === "admin" && user.role === "admin" ? (
-              <AdminPanel users={users} admissions={admissions} onUpdateAdmission={updateAdmissionStatus} onDeleteUser={deleteUser} user={user} />
+              <AdminPanel
+                users={users}
+                admissions={admissions}
+                onUpdateAdmission={updateAdmissionStatus}
+                onDeleteUser={deleteUser}
+                onSaveSiteContent={saveSiteContent}
+                siteContent={siteContent}
+                user={user}
+              />
             ) : null}
 
             {tab === "profile" ? <ProfilePage user={user} onSave={saveProfile} /> : null}

@@ -78,6 +78,10 @@ class AdmissionUpdatePayload(BaseModel):
     adminComment: Optional[str] = None
 
 
+class SiteContentUpdatePayload(BaseModel):
+    content: Dict[str, Any]
+
+
 app = FastAPI(title="School Portal Python API")
 
 app.add_middleware(
@@ -92,7 +96,7 @@ app.add_middleware(
 def read_db() -> Dict[str, Any]:
     with lock:
         if not DATA_FILE.exists():
-            return {"users": [], "news": [], "admissions": []}
+            return {"users": [], "news": [], "admissions": [], "siteContent": {}}
         with DATA_FILE.open("r", encoding="utf-8") as f:
             db = json.load(f)
 
@@ -102,6 +106,8 @@ def read_db() -> Dict[str, Any]:
         db["news"] = []
     if "admissions" not in db:
         db["admissions"] = []
+    if "siteContent" not in db:
+        db["siteContent"] = {}
 
     return db
 
@@ -232,6 +238,15 @@ def public_news() -> Dict[str, Any]:
     db = read_db()
     rows = sorted(db["news"], key=lambda x: x.get("createdAt", ""), reverse=True)[:8]
     return {"news": rows}
+
+
+@app.get("/api/public/site-content")
+def public_site_content() -> Dict[str, Any]:
+    db = read_db()
+    content = db.get("siteContent")
+    if not isinstance(content, dict):
+        content = {}
+    return {"content": content}
 
 
 @app.post("/api/auth/register")
@@ -520,6 +535,18 @@ def dashboard(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
             "teachers": len(teachers),
         }
     }
+
+
+@app.put("/api/site-content")
+def update_site_content(payload: SiteContentUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
+    require_role(user, ["admin"])
+    if not isinstance(payload.content, dict):
+        raise HTTPException(status_code=400, detail="Invalid content payload")
+
+    db = read_db()
+    db["siteContent"] = payload.content
+    write_db(db)
+    return {"content": db["siteContent"]}
 
 
 if __name__ == "__main__":

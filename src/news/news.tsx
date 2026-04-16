@@ -1,6 +1,69 @@
 import { useState } from "react";
 import type { NewsAttachment, NewsItem, Role, SchoolUser } from "../types";
 
+type PhotoGalleryProps = {
+	images: NewsAttachment[];
+};
+
+function PhotoGallery({ images }: PhotoGalleryProps) {
+	const [activeIndex, setActiveIndex] = useState(0);
+
+	if (!images.length) return null;
+
+	const safeIndex = Math.min(activeIndex, images.length - 1);
+	const active = images[safeIndex];
+
+	const prev = () => setActiveIndex((index) => (index - 1 + images.length) % images.length);
+	const next = () => setActiveIndex((index) => (index + 1) % images.length);
+
+	return (
+		<div className="space-y-2">
+			<div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+				<img
+					src={active.dataUrl}
+					alt="Фото новини"
+					className="h-[55vh] max-h-[78vh] w-full rounded-lg bg-slate-100 object-contain"
+				/>
+				{images.length > 1 ? (
+					<>
+						<button
+							onClick={prev}
+							className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+							aria-label="Попереднє фото"
+						>
+							‹
+						</button>
+						<button
+							onClick={next}
+							className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+							aria-label="Наступне фото"
+						>
+							›
+						</button>
+					</>
+				) : null}
+			</div>
+
+			{images.length > 1 ? (
+				<div className="flex gap-2 overflow-x-auto pb-1">
+					{images.map((file, index) => (
+						<button
+							key={file.id}
+							onClick={() => setActiveIndex(index)}
+							className={`shrink-0 overflow-hidden rounded-lg border-2 ${
+								index === safeIndex ? "border-sky-500" : "border-transparent"
+							}`}
+							aria-label={`Фото ${index + 1}`}
+						>
+							<img src={file.dataUrl} alt="Мініатюра" className="h-16 w-24 object-cover" />
+						</button>
+					))}
+				</div>
+			) : null}
+		</div>
+	);
+}
+
 type NewsBoardProps = {
 	items: NewsItem[];
 	role: Role;
@@ -161,33 +224,46 @@ export default function NewsBoard({
 										{new Date(item.createdAt).toLocaleString()} | {item.author}
 									</p>
 									{item.attachments?.length ? (
-										<div className="mt-3 grid gap-3">
-											{item.attachments.map((file) => (
-												<div key={file.id} className="rounded-xl border border-slate-200 p-2 text-xs">
-													<a
-														href={file.dataUrl}
-														target="_blank"
-														rel="noreferrer"
-														className="font-semibold text-sky-700"
-													>
-														{file.name}
-													</a>
-													{file.mimeType.startsWith("image/") ? (
-														<img
-															src={file.dataUrl}
-															alt={file.name}
-															className="mt-2 max-h-[80vh] w-full rounded-lg object-contain"
-														/>
-													) : null}
-													{file.mimeType === "application/pdf" ? (
+										<div className="mt-3 space-y-3">
+											{item.attachments.filter((file) => file.mimeType.startsWith("image/")).length ? (
+												<div>
+													<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+														Фото ({item.attachments.filter((file) => file.mimeType.startsWith("image/")).length})
+													</p>
+													<PhotoGallery images={item.attachments.filter((file) => file.mimeType.startsWith("image/"))} />
+												</div>
+											) : null}
+
+											{item.attachments
+												.filter((file) => file.mimeType === "application/pdf")
+												.map((file) => (
+													<article key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
+														<p className="mb-2 font-semibold text-slate-700">{file.name}</p>
 														<iframe
 															title={file.name}
 															src={`${file.dataUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-															className="mt-2 h-[78vh] w-full rounded-lg border border-slate-200 bg-white"
+															className="h-[78vh] w-full rounded-lg border border-slate-200 bg-white"
 														/>
-													) : null}
-												</div>
-											))}
+													</article>
+												))}
+
+											<div className="grid gap-2">
+												{item.attachments
+													.filter(
+														(file) => !file.mimeType.startsWith("image/") && file.mimeType !== "application/pdf",
+													)
+													.map((file) => (
+														<a
+															key={file.id}
+															href={file.dataUrl}
+															target="_blank"
+															rel="noreferrer"
+															className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-sky-700"
+														>
+															{file.name}
+														</a>
+													))}
+											</div>
 										</div>
 									) : null}
 									{canManage ? (

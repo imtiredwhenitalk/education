@@ -1,4 +1,4 @@
-import type { AdmissionApplication, AdmissionStatus, NewsAttachment, NewsItem, SchoolUser, Stats } from "../types";
+import type { AdmissionApplication, AdmissionStatus, NewsAttachment, NewsItem, SchoolUser, SiteContent, Stats } from "../types";
 
 const TOKEN_KEY = "school_token";
 
@@ -94,6 +94,15 @@ export const api = {
 		return result.news;
 	},
 
+	getPublicSiteContent: async () => {
+		const result = await request<{ content: Partial<SiteContent> }>("/api/public/site-content", {
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+		return result.content;
+	},
+
 	createNews: async (title: string, body: string, attachments: NewsAttachment[] = []) => {
 		return request<{ news: NewsItem }>("/api/news", {
 			method: "POST",
@@ -148,5 +157,13 @@ export const api = {
 			method: "PUT",
 			body: JSON.stringify(payload),
 		});
+	},
+
+	updateSiteContent: async (content: SiteContent) => {
+		const result = await request<{ content: SiteContent }>("/api/site-content", {
+			method: "PUT",
+			body: JSON.stringify({ content }),
+		});
+		return result.content;
 	},
 };

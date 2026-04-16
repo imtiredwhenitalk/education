@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AdmissionApplication, AdmissionStatus, SchoolUser } from "../types";
+import type { AdmissionApplication, AdmissionStatus, SchoolUser, SiteContent } from "../types";
 
 type AdminPanelProps = {
 	users: SchoolUser[];
@@ -9,6 +9,8 @@ type AdminPanelProps = {
 		payload: { status: AdmissionStatus; assignedTeacherId?: string; adminComment?: string },
 	) => Promise<void>;
 	onDeleteUser: (id: string) => Promise<void>;
+	onSaveSiteContent: (content: SiteContent) => Promise<unknown>;
+	siteContent: SiteContent;
 	user: SchoolUser;
 };
 
@@ -18,11 +20,14 @@ type AdmissionDraft = {
 	adminComment: string;
 };
 
-export default function AdminPanel({ users, admissions, onUpdateAdmission, onDeleteUser, user }: AdminPanelProps) {
+export default function AdminPanel({ users, admissions, onUpdateAdmission, onDeleteUser, onSaveSiteContent, siteContent, user }: AdminPanelProps) {
 	const [query, setQuery] = useState("");
 	const [roleFilter, setRoleFilter] = useState("all");
 	const [savingId, setSavingId] = useState("");
 	const [drafts, setDrafts] = useState<Record<string, AdmissionDraft>>({});
+	const [contentJson, setContentJson] = useState(() => JSON.stringify(siteContent, null, 2));
+	const [contentError, setContentError] = useState("");
+	const [savingContent, setSavingContent] = useState(false);
 
 	const classOptions = useMemo(
 		() => Array.from(new Set(users.map((u) => u.className))).sort((a, b) => a.localeCompare(b)),
@@ -61,6 +66,10 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 		});
 	}, [admissions]);
 
+	useEffect(() => {
+		setContentJson(JSON.stringify(siteContent, null, 2));
+	}, [siteContent]);
+
 	const updateDraft = (id: string, patch: Partial<AdmissionDraft>) => {
 		setDrafts((prev) => {
 			const current = prev[id] || {
@@ -91,6 +100,32 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 			});
 		} finally {
 			setSavingId("");
+		}
+	};
+
+	const saveSiteContent = async () => {
+		setContentError("");
+		let parsed: unknown;
+
+		try {
+			parsed = JSON.parse(contentJson);
+		} catch {
+			setContentError("Невірний JSON. Перевір формат.");
+			return;
+		}
+
+		if (!parsed || typeof parsed !== "object") {
+			setContentError("Контент має бути JSON-об'єктом.");
+			return;
+		}
+
+		setSavingContent(true);
+		try {
+			await onSaveSiteContent(parsed as SiteContent);
+		} catch {
+			setContentError("Не вдалося зберегти контент.");
+		} finally {
+			setSavingContent(false);
 		}
 	};
 
@@ -246,6 +281,40 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 					</article>
 				))}
 			</div>
+			</article>
+
+			<article className="rounded-2xl border border-slate-300 bg-white/80 p-5 shadow-panel">
+				<h2 className="mb-2 text-xl font-bold text-slate-900">Редагування головної сторінки</h2>
+				<p className="mb-3 text-sm text-slate-600">
+					Тут можна змінити весь контент головної через JSON. Редагуй тексти, блоки quick info, кнопки і картки.
+				</p>
+
+				<textarea
+					className="min-h-[420px] w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs"
+					value={contentJson}
+					onChange={(e) => setContentJson(e.target.value)}
+				/>
+
+				{contentError ? <p className="mt-2 text-sm text-rose-600">{contentError}</p> : null}
+
+				<div className="mt-3 flex flex-wrap gap-2">
+					<button
+						onClick={saveSiteContent}
+						disabled={savingContent}
+						className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700 hover:scale-105 disabled:opacity-60"
+					>
+						{savingContent ? "Збереження..." : "Зберегти контент головної"}
+					</button>
+					<button
+						onClick={() => {
+							setContentJson(JSON.stringify(siteContent, null, 2));
+							setContentError("");
+						}}
+						className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition-all duration-300 hover:bg-slate-300 hover:scale-105"
+					>
+						Скинути зміни
+					</button>
+				</div>
 			</article>
 		</section>
 	);
