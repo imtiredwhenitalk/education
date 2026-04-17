@@ -26,7 +26,6 @@ DATA_FILE = ROOT_DIR / "backend_py" / "data" / "store.json"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 lock = threading.Lock()
 
-
 class RegisterPayload(BaseModel):
     fullName: str
     email: str
@@ -38,7 +37,6 @@ class RegisterPayload(BaseModel):
 class LoginPayload(BaseModel):
     email: str
     password: str
-
 
 class ProfileUpdatePayload(BaseModel):
     fullName: Optional[str] = None
@@ -449,7 +447,6 @@ def update_admission(admission_id: str, payload: AdmissionUpdatePayload, user: D
     except Exception as e:
         print("UPDATE_ADMISSION_ERROR:", repr(e))
         raise
-
 
 @app.get("/api/news")
 def get_news(_user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
