@@ -35,7 +35,11 @@ export type QuickInfoItem = {
   title: string;
   intro: string;
   details: string[];
+  attachments?: NewsAttachment[];
+  linkUrl?: string;
 };
+
+export type DistanceLearningLinks = Record<string, string>;
 
 export type InfoCard = {
   title: string;
@@ -56,7 +60,10 @@ export type SiteContent = {
   newsTitle: string;
   newsSubtitle: string;
   newsButtonText: string;
+  distanceLearningTitle: string;
+  distanceLearningSubtitle: string;
   quickInfoMap: Record<string, QuickInfoItem>;
+  distanceLearningLinks: DistanceLearningLinks;
   infoCards: InfoCard[];
 };
 

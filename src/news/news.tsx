@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isSupportedAttachment, toAttachment } from "../utils/attachments";
 import type { NewsAttachment, NewsItem, Role, SchoolUser } from "../types";
 
 type PhotoGalleryProps = {
@@ -91,37 +92,9 @@ export default function NewsBoard({
 
 	const canPublish = role === "teacher" || role === "admin";
 
-	const toAttachment = (file: File): Promise<NewsAttachment> =>
-		new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => {
-				if (typeof reader.result !== "string") {
-					reject(new Error("Invalid file"));
-					return;
-				}
-
-				resolve({
-					id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-					name: file.name,
-					mimeType: file.type || "application/octet-stream",
-					dataUrl: reader.result,
-				});
-			};
-			reader.onerror = () => reject(new Error("Failed to read file"));
-			reader.readAsDataURL(file);
-		});
-
 	const onSelectFiles = async (files: FileList | null, editMode = false) => {
 		if (!files || !files.length) return;
-		const accepted = Array.from(files).filter((file) => {
-			const isImage = file.type.startsWith("image/");
-			const isPdf = file.type === "application/pdf";
-			const isDoc =
-				file.type === "application/msword" ||
-				file.type ===
-					"application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-			return isImage || isPdf || isDoc;
-		});
+		const accepted = Array.from(files).filter((file) => isSupportedAttachment(file));
 
 		const prepared = await Promise.all(accepted.map((file) => toAttachment(file)));
 		if (editMode) {

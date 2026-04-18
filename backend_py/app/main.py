@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
@@ -56,7 +56,7 @@ class AttachmentPayload(BaseModel):
 class NewsPayload(BaseModel):
     title: str
     body: str
-    attachments: List[AttachmentPayload] = []
+    attachments: List[AttachmentPayload] = Field(default_factory=list)
 
 
 class AdmissionCreatePayload(BaseModel):
@@ -67,7 +67,7 @@ class AdmissionCreatePayload(BaseModel):
     parentPhone: str
     email: str
     notes: str = ""
-    attachments: List[AttachmentPayload] = []
+    attachments: List[AttachmentPayload] = Field(default_factory=list)
 
 
 class AdmissionUpdatePayload(BaseModel):
@@ -356,6 +356,11 @@ def delete_user(user_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict
     db["news"] = [n for n in db["news"] if n.get("ownerId") != user_id]
     db["admissions"] = [a for a in db["admissions"] if a.get("linkedStudentId") != user_id]
 
+    # Якщо видаляється вчитель, відв'язуємо його від учнів.
+    for candidate in db["users"]:
+        if candidate.get("assignedTeacherId") == user_id:
+            candidate["assignedTeacherId"] = None
+
     # Видаляємо користувача
     db["users"].pop(index)
     write_db(db)
@@ -400,53 +405,49 @@ def get_admissions(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
 
 @app.put("/api/admissions/{admission_id}")
 def update_admission(admission_id: str, payload: AdmissionUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
-    try:
-        require_role(user, ["admin"])
-        db = read_db()
+    require_role(user, ["admin"])
+    db = read_db()
 
-        index = next((i for i, x in enumerate(db["admissions"]) if x["id"] == admission_id), -1)
-        if index == -1:
-            raise HTTPException(status_code=404, detail="Admission not found")
+    index = next((i for i, x in enumerate(db["admissions"]) if x["id"] == admission_id), -1)
+    if index == -1:
+        raise HTTPException(status_code=404, detail="Admission not found")
 
-        admission = db["admissions"][index]
-        next_status = payload.status.strip().lower()
-        if next_status not in ["pending", "accepted", "rejected"]:
-            raise HTTPException(status_code=400, detail="Invalid status")
+    admission = db["admissions"][index]
+    next_status = payload.status.strip().lower()
+    if next_status not in ["pending", "accepted", "rejected"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
 
-        teacher_id = payload.assignedTeacherId
-        if next_status == "accepted":
-            if not teacher_id:
-                raise HTTPException(status_code=400, detail="Select teacher before accepting")
-            teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
-            if not teacher:
-                raise HTTPException(status_code=404, detail="Teacher not found")
+    teacher_id = payload.assignedTeacherId
+    if next_status == "accepted":
+        if not teacher_id:
+            raise HTTPException(status_code=400, detail="Select teacher before accepting")
+        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+        if not teacher:
+            raise HTTPException(status_code=404, detail="Teacher not found")
 
-            linked_student_id = upsert_student_from_admission(db, admission, teacher_id)
-            admission["linkedStudentId"] = linked_student_id
+        linked_student_id = upsert_student_from_admission(db, admission, teacher_id)
+        admission["linkedStudentId"] = linked_student_id
+        admission["assignedTeacherId"] = teacher_id
+
+        # Повертаємо admission перед видаленням
+        result = {"admission": admission}
+
+        # Видаляємо заявку після прийняття
+        db["admissions"].pop(index)
+        write_db(db)
+        return result
+    elif teacher_id:
+        teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
+        if teacher:
             admission["assignedTeacherId"] = teacher_id
 
-            # Повертаємо admission перед видаленням
-            result = {"admission": admission}
+    admission["status"] = next_status
+    admission["adminComment"] = (payload.adminComment or "").strip()
+    admission["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
-            # Видаляємо заявку після прийняття
-            db["admissions"].pop(index)
-            write_db(db)
-            return result
-        elif teacher_id:
-            teacher = next((u for u in db["users"] if u["id"] == teacher_id and u["role"] == "teacher"), None)
-            if teacher:
-                admission["assignedTeacherId"] = teacher_id
-
-        admission["status"] = next_status
-        admission["adminComment"] = (payload.adminComment or "").strip()
-        admission["updatedAt"] = datetime.now(timezone.utc).isoformat()
-
-        db["admissions"][index] = admission
-        write_db(db)
-        return {"admission": admission}
-    except Exception as e:
-        print("UPDATE_ADMISSION_ERROR:", repr(e))
-        raise
+    db["admissions"][index] = admission
+    write_db(db)
+    return {"admission": admission}
 
 @app.get("/api/news")
 def get_news(_user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
@@ -479,6 +480,9 @@ def create_news(payload: NewsPayload, user: Dict[str, Any] = Depends(auth_user))
 @app.put("/api/news/{news_id}")
 def update_news(news_id: str, payload: NewsPayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
     require_role(user, ["teacher", "admin"])
+    if not payload.title.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Title and body required")
+
     db = read_db()
 
     index = next((i for i, x in enumerate(db["news"]) if x["id"] == news_id), -1)

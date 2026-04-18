@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import AdminPanel from "./admin/admin";
 import AboutPage from "./about/about";
 import { api } from "./api/api";
+import { defaultSiteContent, normalizeSiteContent } from "./content/siteContent";
 import AuthSection from "./auth/auth";
 import NewsBoard from "./news/news";
 import ProfilePage from "./profile/profile";
+import { isSupportedAttachment, toAttachment } from "./utils/attachments";
 import type { AdmissionApplication, NewsAttachment, NewsItem, QuickInfoItem, SchoolUser, SiteContent, Stats } from "./types";
 
 type Tab = "home" | "news" | "admin" | "profile" | "about";
-type PublicPage = "landing" | "auth" | "news" | "admission" | "app" | "quickinfo";
+type PublicPage = "landing" | "auth" | "news" | "admission" | "app" | "quickinfo" | "distance-learning";
 
 type AdmissionFormState = {
   fullName: string;
@@ -26,6 +28,21 @@ type QuickInfoEditorRow = {
   title: string;
   intro: string;
   detailsText: string;
+  attachments: NewsAttachment[];
+  linkUrl: string;
+};
+
+type AudienceKey = "parents" | "students" | "teachers";
+
+type AudienceSection = {
+  title: string;
+  items: string[];
+};
+
+type AudienceDetails = {
+  title: string;
+  intro: string;
+  sections: AudienceSection[];
 };
 
 const defaultAdmissionForm: AdmissionFormState = {
@@ -46,247 +63,171 @@ const tabLabels: Record<Tab, string> = {
   about: "Про сайт",
 };
 
-const defaultQuickInfoMap: Record<string, QuickInfoItem> = {
-  "Головна сторінка": {
-    title: "Головна сторінка",
-    intro: "Короткий огляд усіх ключових розділів порталу.",
-    details: [
-      "На головній розміщено швидкий доступ до вступу, новин та контактів.",
-      "Оновлення по подіям і важливих оголошеннях з'являються одразу після публікації.",
+const audienceDetailsMap: Record<AudienceKey, AudienceDetails> = {
+  parents: {
+    title: "Інформація для батьків",
+    intro:
+      "У цьому розділі зібрано все, що потрібно батькам для щоденної взаємодії зі школою: навчання, комунікація, безпека, документи та підтримка дитини.",
+    sections: [
+      {
+        title: "Комунікація зі школою",
+        items: [
+          "Основний канал зв'язку з класним керівником доступний у профілі класу.",
+          "Офіційні оголошення публікуються на головній сторінці та в новинах.",
+          "Термінові повідомлення дублюються через адміністратора і класних керівників.",
+          "Для індивідуальних звернень використовуй контакти приймальні та email закладу.",
+        ],
+      },
+      {
+        title: "Навчальний процес",
+        items: [
+          "Розклад уроків та зміни публікуються централізовано в розділі ліцею.",
+          "Актуальні події та навчальні активності виносяться в стрічку новин.",
+          "Важливі дедлайни вступу, олімпіад і консультацій доступні у quick info.",
+          "За потреби можна відслідковувати документи для вступу або переведення дитини.",
+        ],
+      },
+      {
+        title: "Документи та довідки",
+        items: [
+          "Заяви та супровідні документи можна подавати в цифровому вигляді.",
+          "PDF-файли відображаються прямо на сторінці для зручної перевірки.",
+          "Рекомендовано завантажувати скани хорошої якості з читабельним текстом.",
+          "Оригінали документів подаються відповідно до графіка приймальної комісії.",
+        ],
+      },
+      {
+        title: "Психологічна та безпекова підтримка",
+        items: [
+          "Працює шкільний психолог для індивідуальних консультацій.",
+          "У разі булінгу діє чіткий алгоритм звернення до відповідальних осіб.",
+          "Питання безпечної поведінки онлайн винесені в окремий інформаційний блок.",
+          "Школа підтримує конфіденційність звернень і супровід родини.",
+        ],
+      },
+      {
+        title: "Участь у шкільному житті",
+        items: [
+          "Батьки можуть слідкувати за подіями, проєктами та досягненнями класу.",
+          "Відкриті зустрічі адміністрації анонсуються заздалегідь на порталі.",
+          "Звіт директора, кошторис і ключові рішення публікуються прозоро.",
+          "Рекомендується регулярно переглядати розділи новин і quick info.",
+        ],
+      },
     ],
   },
-  "Основна інформація": {
-    title: "Основна інформація",
-    intro: "Базові відомості про ліцей, структуру навчання та документи.",
-    details: [
-      "Форма навчання: очна та змішана (за потреби).",
-      "Профільні напрями: математичний, філологічний, ІТ-напрям.",
-      "Режим роботи, правила внутрішнього розпорядку, контакти адміністрації.",
+  students: {
+    title: "Інформація для учнів",
+    intro:
+      "Тут зібрано практичні інструкції для навчання: як користуватись порталом, де шукати матеріали, як готуватись до оцінювання і куди звертатись по допомогу.",
+    sections: [
+      {
+        title: "Щоденне навчання",
+        items: [
+          "Оперативно перевіряй розклад уроків і зміни перед початком занять.",
+          "Слідкуй за новинами класу, конкурсами, олімпіадами та гуртками.",
+          "Зберігай важливі файли з новин: методички, положення, інструкції.",
+          "Плануй підготовку до контрольних на основі шкільного календаря.",
+        ],
+      },
+      {
+        title: "Підготовка до ДПА/НМТ",
+        items: [
+          "У розділах порталу є дедлайни реєстрації та важливі дати кампаній.",
+          "Ознайомлюйся з рекомендаціями, демо-матеріалами та минулорічними прикладами.",
+          "Регулярно відпрацьовуй теми з базових предметів: мова, математика, історія.",
+          "Використовуй консультації вчителів для закриття складних тем.",
+        ],
+      },
+      {
+        title: "Цифрова безпека",
+        items: [
+          "Не передавай логін і пароль стороннім особам.",
+          "Використовуй складні паролі та періодично їх оновлюй.",
+          "Довіряй лише офіційним оголошенням на порталі школи.",
+          "Повідомляй вчителя або адміністратора про підозрілі повідомлення.",
+        ],
+      },
+      {
+        title: "Підтримка і розвиток",
+        items: [
+          "Психологічна підтримка доступна за попереднім записом.",
+          "Учнівське самоврядування дозволяє впливати на шкільні ініціативи.",
+          "Бери участь у волонтерських та проєктних активностях ліцею.",
+          "Формуй власне портфоліо досягнень на основі участі в подіях.",
+        ],
+      },
+      {
+        title: "Правила академічної доброчесності",
+        items: [
+          "Самостійне виконання завдань - основа чесного оцінювання.",
+          "Плагіат і списування заборонені та впливають на результати.",
+          "Під час підготовки робіт коректно посилайся на використані джерела.",
+          "За порушення правил застосовуються шкільні процедури реагування.",
+        ],
+      },
     ],
   },
-  "Про нас": {
-    title: "Про нас",
-    intro: "Місія ліцею та освітні цінності.",
-    details: [
-      "Ліцей формує компетентності для навчання, кар'єри і життя в цифровому суспільстві.",
-      "Пріоритети: якість освіти, безпека, партнерство з батьками та розвиток учнів.",
-    ],
-  },
-  "Педагогічна рада": {
-    title: "Педагогічна рада",
-    intro: "Рішення та напрями розвитку освітнього процесу.",
-    details: [
-      "Розглядаються результати навчання, інноваційні методики та план підвищення кваліфікації.",
-      "Протоколи педради доступні адміністрації та педагогам у внутрішній частині порталу.",
-    ],
-  },
-  "Виховна робота": {
-    title: "Виховна робота",
-    intro: "Позаурочні ініціативи та громадянське виховання.",
-    details: [
-      "Працюють гуртки, тематичні тижні, волонтерські та спортивні активності.",
-      "Класні керівники публікують плани і звіти про виховні події.",
-    ],
-  },
-  "Вступ 2026": {
-    title: "Вступ 2026",
-    intro: "Інформація для вступників на 2026 навчальний рік.",
-    details: [
-      "Реєстрація заявок: з 1 березня до 15 червня 2026 року.",
-      "Пакет документів: заява, свідоцтво, медична довідка, паспорт одного з батьків.",
-      "Для профільних класів передбачено співбесіду або діагностичну роботу.",
-    ],
-  },
-  "Прийом учнів до 1-го класу": {
-    title: "Прийом до 1-го класу",
-    intro: "Календар подачі документів для майбутніх першокласників.",
-    details: [
-      "Прийом заяв триває відповідно до графіка, затвердженого закладом.",
-      "Першочергово зараховуються діти, які проживають на території обслуговування.",
-      "Результати зарахування публікуються на сайті та інформаційному стенді закладу.",
-    ],
-  },
-  "Розклад уроків": {
-    title: "Розклад уроків",
-    intro: "Актуальний розклад занять, факультативів та консультацій.",
-    details: [
-      "Оновлення публікуються щотижня або оперативно у випадку змін.",
-      "У профілі учня відображається персоналізований розклад класу.",
-    ],
-  },
-  "Освітні програми": {
-    title: "Освітні програми",
-    intro: "Опис навчальних програм, компетентностей і результатів.",
-    details: [
-      "Програми відповідають державному стандарту та профілю ліцею.",
-      "Публікуються навчальні плани, очікувані результати і критерії оцінювання.",
-    ],
-  },
-  "ДПА / ЗНО / НМТ": {
-    title: "ДПА, ЗНО, НМТ",
-    intro: "Підготовка до підсумкової атестації та вступних тестувань.",
-    details: [
-      "Розділ містить календар реєстрації на НМТ, пробні тести та важливі дедлайни.",
-      "Публікуються рекомендації з підготовки, матеріали минулих років і зміни процедур.",
-      "Для випускників доступні консультації з української, математики та історії України.",
-    ],
-  },
-  "Внутрішня система якості освіти": {
-    title: "Внутрішня система якості освіти",
-    intro: "Прозорі механізми оцінювання якості освітнього процесу.",
-    details: [
-      "Щорічно проводиться самооцінювання за напрямами: управління, навчання, безпека.",
-      "За підсумками формуються плани покращення та пріоритети розвитку закладу.",
-    ],
-  },
-  "Моніторинг якості освіти": {
-    title: "Моніторинг якості освіти",
-    intro: "Аналітика успішності та динаміки навчальних результатів.",
-    details: [
-      "Відстежуються середні бали по класах, предметах і паралелях.",
-      "Результати моніторингу допомагають вчасно коригувати навчальний процес.",
-    ],
-  },
-  "Академічна доброчесність": {
-    title: "Академічна доброчесність",
-    intro: "Політика чесного навчання та відповідального використання джерел.",
-    details: [
-      "Заборонено плагіат, списування, фабрикацію даних та несанкціоновану допомогу.",
-      "Учні і вчителі ознайомлюються з правилами цитування та етичної поведінки.",
-    ],
-  },
-  "Психологічна підтримка": {
-    title: "Психологічна підтримка",
-    intro: "Допомога учням, батькам і педагогам у складних ситуаціях.",
-    details: [
-      "Працюють індивідуальні консультації, групові заняття та профілактичні зустрічі.",
-      "Звернення до психолога конфіденційні та доступні за попереднім записом.",
-    ],
-  },
-  "Булінг: план дій": {
-    title: "Булінг: план дій",
-    intro: "Алгоритм дій у разі виявлення булінгу.",
-    details: [
-      "Негайно повідом класного керівника, психолога або адміністрацію.",
-      "Фіксуй факти та звертайся до відповідальних осіб для офіційного розгляду.",
-      "Ліцей забезпечує захист учасників освітнього процесу та супровід ситуації.",
-    ],
-  },
-  "Інформаційна безпека": {
-    title: "Інформаційна безпека",
-    intro: "Правила безпечної поведінки в інтернеті і захисту даних.",
-    details: [
-      "Використовуй складні паролі, не передавай персональні дані стороннім.",
-      "Офіційні оголошення публікуються лише через перевірені канали ліцею.",
-    ],
-  },
-  "Атестація педагогічних працівників": {
-    title: "Атестація педагогічних працівників",
-    intro: "План і критерії професійного оцінювання педагогів.",
-    details: [
-      "Проводиться згідно з чинним законодавством та внутрішнім графіком.",
-      "Результати враховують методичну діяльність, підвищення кваліфікації та успішність учнів.",
-    ],
-  },
-  "Звіт директора": {
-    title: "Звіт директора",
-    intro: "Публічний звіт про діяльність закладу за навчальний рік.",
-    details: [
-      "Охоплює результати навчання, фінанси, кадровий склад та стратегічні цілі.",
-      "Звіт презентується на відкритій зустрічі для батьківської і педагогічної спільноти.",
-    ],
-  },
-  Кошторис: {
-    title: "Кошторис",
-    intro: "Інформація про бюджет і використання коштів закладу.",
-    details: [
-      "Опубліковано основні статті витрат: обладнання, господарські потреби, розвиток інфраструктури.",
-      "Фінансова інформація оновлюється відповідно до звітних періодів.",
-    ],
-  },
-  "Учнівське самоврядування": {
-    title: "Учнівське самоврядування",
-    intro: "Ініціативи учнів та участь у шкільному житті.",
-    details: [
-      "Працює учнівська рада, яка пропонує та реалізує проєкти й події.",
-      "Учні беруть участь у прийнятті рішень щодо позакласної діяльності.",
-    ],
-  },
-  Контакти: {
-    title: "Контакти",
-    intro: "Канали зв'язку з адміністрацією та відповідальними особами.",
-    details: [
-      "Приймальня: +380 (33) 000-00-00.",
-      "Email: office@lyceum.edu.ua.",
-      "Адреса: м. Луцьк, вул. Шкільна, 10.",
-    ],
-  },
-  "Новини ліцею": {
-    title: "Новини ліцею",
-    intro: "Оголошення, події та досягнення шкільної спільноти.",
-    details: [
-      "Публікуємо результати конкурсів, заходи, зустрічі та важливі повідомлення.",
-      "Кнопка \"Всі новини\" відкриває повний перелік новин із можливістю читати повний текст.",
+  teachers: {
+    title: "Інформація для вчителів",
+    intro:
+      "Розділ для педагогів з практичними орієнтирами: організація навчання, робота з контентом порталу, комунікація з батьками, супровід учнів і професійний розвиток.",
+    sections: [
+      {
+        title: "Робота з контентом порталу",
+        items: [
+          "Публікуй новини структуровано: заголовок, короткий опис, вкладення.",
+          "Для документів використовуй зрозумілі назви файлів з датою та темою.",
+          "Візуальні матеріали завантажуй у читабельній якості без обрізання змісту.",
+          "Оновлюй застарілі оголошення, щоб учні і батьки бачили актуальні дані.",
+        ],
+      },
+      {
+        title: "Організація навчального процесу",
+        items: [
+          "Синхронізуй календар оцінювань з шкільними подіями та дедлайнами.",
+          "Плануй консультації для класів із нижчими результатами моніторингу.",
+          "Регулярно інформуй учнів про критерії оцінювання і вимоги до робіт.",
+          "Використовуй новини порталу для централізованої комунікації з класом.",
+        ],
+      },
+      {
+        title: "Взаємодія з батьками",
+        items: [
+          "Заздалегідь публікуй оголошення про збори, зміни і позакласні події.",
+          "Надавай чіткі інструкції щодо документів і форматів подачі.",
+          "Фіксуй ключові домовленості після важливих зустрічей.",
+          "Підтримуй єдиний тон комунікації: фактично, прозоро, без двозначностей.",
+        ],
+      },
+      {
+        title: "Підтримка учнів",
+        items: [
+          "Виявляй ризики перевантаження і спрямовуй учнів до психолога за потреби.",
+          "Оперативно реагуй на сигнали булінгу згідно з внутрішнім алгоритмом.",
+          "Створюй безпечний простір для зворотного зв'язку від класу.",
+          "Підсилюй мотивацію через участь учнів у проєктах та конкурсах.",
+        ],
+      },
+      {
+        title: "Професійний розвиток",
+        items: [
+          "План атестації і підвищення кваліфікації ведеться в межах шкільного графіка.",
+          "Фіксуй методичні напрацювання та результати педагогічних практик.",
+          "Обмінюйся кейсами на педрадах для поширення ефективних підходів.",
+          "Використовуй аналітику успішності для корекції навчальних стратегій.",
+        ],
+      },
     ],
   },
 };
 
-const defaultInfoCards = [
-  {
-    title: "Для батьків",
-    text: "Контакти з класними керівниками, оголошення про збори та важливі шкільні події.",
-    accent: "from-cyan-500 to-sky-500",
-  },
-  {
-    title: "Для учнів",
-    text: "Доступ до навчальних ресурсів, новин школи та персонального профілю.",
-    accent: "from-emerald-500 to-lime-500",
-  },
-  {
-    title: "Для вчителів",
-    text: "Публікація новин, керування навчальною інформацією та підтримка учнів.",
-    accent: "from-blue-500 to-indigo-500",
-  },
-];
-
-const defaultSiteContent: SiteContent = {
-  headerKicker: "Офіційний вебпортал ліцею",
-  headerTitle: "School Portal",
-  headerSubtitle: "Сучасний сайт школи з новинами, навчальними сервісами і персональними кабінетами.",
-  heroKicker: "Головна сторінка школи",
-  heroTitle: "Луцький ліцей нового покоління: освіта, безпека, розвиток і технології в одному просторі",
-  heroText:
-    "Тут зібрана вся ключова інформація про заклад: освітні програми, вступ, правила, новини, контакти, а також цифрові сервіси для учнів, вчителів і батьків.",
-  ctaAdmission: "Подати заявку на вступ",
-  ctaCabinet: "Увійти до кабінету",
-  ctaNews: "Переглянути всі новини",
-  newsTitle: "Новини ліцею",
-  newsSubtitle: "Події, оголошення та важлива інформація",
-  newsButtonText: "Всі новини",
-  quickInfoMap: defaultQuickInfoMap,
-  infoCards: defaultInfoCards,
-};
-
-const normalizeSiteContent = (incoming: Partial<SiteContent> | null | undefined): SiteContent => {
-  if (!incoming || typeof incoming !== "object") {
-    return defaultSiteContent;
-  }
-
-  const map =
-    incoming.quickInfoMap && typeof incoming.quickInfoMap === "object"
-      ? (incoming.quickInfoMap as Record<string, QuickInfoItem>)
-      : defaultSiteContent.quickInfoMap;
-
-  const cards = Array.isArray(incoming.infoCards) && incoming.infoCards.length
-    ? incoming.infoCards
-    : defaultSiteContent.infoCards;
-
-  return {
-    ...defaultSiteContent,
-    ...incoming,
-    quickInfoMap: map,
-    infoCards: cards,
-  };
+const resolveAudienceByCardTitle = (title: string): AudienceKey => {
+  const normalized = title.trim().toLowerCase();
+  if (normalized.includes("бать")) return "parents";
+  if (normalized.includes("учн")) return "students";
+  if (normalized.includes("вчител")) return "teachers";
+  return "students";
 };
 
 export default function Page() {
@@ -310,6 +251,9 @@ export default function Page() {
   const [landingSaving, setLandingSaving] = useState(false);
   const [publicNewsQuery, setPublicNewsQuery] = useState("");
   const [selectedPublicNewsImageIndex, setSelectedPublicNewsImageIndex] = useState(0);
+  const [selectedQuickInfoImageIndex, setSelectedQuickInfoImageIndex] = useState(0);
+  const [selectedAudience, setSelectedAudience] = useState<AudienceKey | null>(null);
+  const [selectedDistanceClass, setSelectedDistanceClass] = useState("1");
 
   const [searchStudent, setSearchStudent] = useState("");
   const [admissionForm, setAdmissionForm] = useState<AdmissionFormState>(defaultAdmissionForm);
@@ -409,27 +353,6 @@ export default function Page() {
     return map;
   }, [users]);
 
-  const register = async (payload: {
-    fullName: string;
-    email: string;
-    password: string;
-    className: string;
-    role: "student" | "teacher";
-  }) => {
-    try {
-      setLoading(true);
-      await api.register(payload);
-      setMessage("Акаунт створено. Тепер увійди в систему.");
-      setPublicPage("auth");
-      clearMessageLater();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Помилка реєстрації");
-      clearMessageLater();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
@@ -459,35 +382,9 @@ export default function Page() {
     setTab("home");
   };
 
-  const toAttachment = (file: File): Promise<NewsAttachment> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== "string") {
-          reject(new Error("Invalid file"));
-          return;
-        }
-        resolve({
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          dataUrl: reader.result,
-        });
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-
   const onAdmissionFiles = async (files: FileList | null) => {
     if (!files || !files.length) return;
-    const accepted = Array.from(files).filter((file) => {
-      const isImage = file.type.startsWith("image/");
-      const isPdf = file.type === "application/pdf";
-      const isDoc =
-        file.type === "application/msword" ||
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      return isImage || isPdf || isDoc;
-    });
+    const accepted = Array.from(files).filter((file) => isSupportedAttachment(file));
 
     const prepared = await Promise.all(accepted.map((file) => toAttachment(file)));
     setAdmissionAttachments((prev) => [...prev, ...prepared]);
@@ -625,7 +522,25 @@ export default function Page() {
     }
   };
 
-  const quickButtons = Object.keys(siteContent.quickInfoMap || {});
+  const quickButtonEntries = Object.entries(siteContent.quickInfoMap || {});
+  const distanceClassOptions = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+
+  const normalizeExternalUrl = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    if (/^(https?:\/\/|mailto:|tel:)/i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return `https://${trimmed}`;
+  };
+
+  const openExternalLink = (value: string) => {
+    const normalized = normalizeExternalUrl(value);
+    if (!normalized) return;
+    window.open(normalized, "_blank", "noopener,noreferrer");
+  };
 
   const toQuickInfoDraftRows = (map: Record<string, QuickInfoItem>): QuickInfoEditorRow[] =>
     Object.entries(map).map(([label, item]) => ({
@@ -634,6 +549,8 @@ export default function Page() {
       title: item.title,
       intro: item.intro,
       detailsText: item.details.join("\n"),
+      attachments: item.attachments || [],
+      linkUrl: item.linkUrl || "",
     }));
 
   useEffect(() => {
@@ -687,6 +604,29 @@ export default function Page() {
     setQuickInfoDraftRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
+  const onQuickInfoFiles = async (rowId: string, files: FileList | null) => {
+    if (!files || !files.length) return;
+    const accepted = Array.from(files).filter((file) => isSupportedAttachment(file));
+    if (!accepted.length) return;
+
+    const prepared = await Promise.all(accepted.map((file) => toAttachment(file)));
+    setQuickInfoDraftRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId ? { ...row, attachments: [...row.attachments, ...prepared] } : row,
+      ),
+    );
+  };
+
+  const removeQuickInfoAttachment = (rowId: string, attachmentId: string) => {
+    setQuickInfoDraftRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId
+          ? { ...row, attachments: row.attachments.filter((item) => item.id !== attachmentId) }
+          : row,
+      ),
+    );
+  };
+
   const addQuickInfoRow = () => {
     setQuickInfoDraftRows((prev) => [
       ...prev,
@@ -696,6 +636,8 @@ export default function Page() {
         title: "Новий розділ",
         intro: "Короткий опис",
         detailsText: "Пункт 1",
+        attachments: [],
+        linkUrl: "",
       },
     ]);
   };
@@ -730,6 +672,8 @@ export default function Page() {
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean),
+        attachments: row.attachments,
+        linkUrl: normalizeExternalUrl(row.linkUrl),
       };
     });
 
@@ -776,18 +720,40 @@ export default function Page() {
     if (!query) return publicNews;
 
     return publicNews.filter((item) => {
-      const byTitle = item.title.toLowerCase().includes(query);
-      const dateUa = new Date(item.createdAt).toLocaleDateString("uk-UA").toLowerCase();
-      const dateIso = item.createdAt.slice(0, 10).toLowerCase();
-      return byTitle || dateUa.includes(query) || dateIso.includes(query);
+      return item.title.toLowerCase().includes(query);
     });
   }, [publicNews, publicNewsQuery]);
 
   const selectedPublicNewsImages = selectedPublicNews?.attachments?.filter((file) => file.mimeType.startsWith("image/")) || [];
+  const selectedQuickInfoSection = siteContent.quickInfoMap[selectedQuickInfoPage];
+  const selectedQuickInfoAttachments = selectedQuickInfoSection?.attachments || [];
+  const selectedQuickInfoImages = selectedQuickInfoAttachments.filter((file) => file.mimeType.startsWith("image/"));
+  const selectedQuickInfoPdfFiles = selectedQuickInfoAttachments.filter((file) => file.mimeType === "application/pdf");
+  const selectedQuickInfoOtherFiles = selectedQuickInfoAttachments.filter(
+    (file) => !file.mimeType.startsWith("image/") && file.mimeType !== "application/pdf",
+  );
+  const selectedDistanceLearningLink = normalizeExternalUrl(siteContent.distanceLearningLinks?.[selectedDistanceClass] || "");
 
   useEffect(() => {
     setSelectedPublicNewsImageIndex(0);
   }, [selectedPublicNewsId]);
+
+  useEffect(() => {
+    setSelectedQuickInfoImageIndex(0);
+  }, [selectedQuickInfoPage]);
+
+  useEffect(() => {
+    if (!selectedAudience) return;
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedAudience(null);
+      }
+    };
+
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [selectedAudience]);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 transition-all duration-500">
@@ -832,7 +798,7 @@ export default function Page() {
                 <button
                   onClick={() => setPublicPage("auth")}
                   className="rounded-full border border-slate-300 bg-white p-2 shadow transition-all duration-300 hover:shadow-md hover:scale-110"
-                  title="Сторінка входу і реєстрації"
+                  title="Сторінка входу"
                 >
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="8" r="4" stroke="#0f172a" strokeWidth="1.8" />
@@ -859,10 +825,21 @@ export default function Page() {
             </p>
 
             <div className="relative mt-5 flex flex-wrap gap-2">
-              {quickButtons.map((label) => (
+              <button
+                onClick={() => setPublicPage("distance-learning")}
+                className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-cyan-100 hover:scale-105 hover:shadow-lg"
+              >
+                Дистанційне навчання
+              </button>
+
+              {quickButtonEntries.map(([label, item]) => (
                 <button
                   key={label}
                   onClick={() => {
+                    if (item.linkUrl) {
+                      openExternalLink(item.linkUrl);
+                      return;
+                    }
                     setSelectedQuickInfoPage(label);
                     setPublicPage("quickinfo");
                   }}
@@ -974,12 +951,63 @@ export default function Page() {
                     <div className="grid gap-2 md:grid-cols-2">
                       <input className="rounded-lg border border-slate-300 px-3 py-2" value={row.label} onChange={(e) => updateQuickInfoRow(row.id, { label: e.target.value })} placeholder="Назва кнопки/розділу" />
                       <input className="rounded-lg border border-slate-300 px-3 py-2" value={row.title} onChange={(e) => updateQuickInfoRow(row.id, { title: e.target.value })} placeholder="Заголовок сторінки" />
+                      <input className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" value={row.linkUrl} onChange={(e) => updateQuickInfoRow(row.id, { linkUrl: e.target.value })} placeholder="Гіперпосилання кнопки (https://drive.google.com/... або інше)" />
                       <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={2} value={row.intro} onChange={(e) => updateQuickInfoRow(row.id, { intro: e.target.value })} placeholder="Короткий вступ" />
                       <textarea className="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2" rows={4} value={row.detailsText} onChange={(e) => updateQuickInfoRow(row.id, { detailsText: e.target.value })} placeholder="Пункти списку (кожен з нового рядка)" />
+                      <div className="md:col-span-2">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf,.doc,.docx"
+                          onChange={(e) => onQuickInfoFiles(row.id, e.target.files)}
+                        />
+                        {row.attachments.length ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {row.attachments.map((file) => (
+                              <button
+                                key={file.id}
+                                onClick={() => removeQuickInfoAttachment(row.id, file.id)}
+                                className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                              >
+                                {file.name} x
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                     <button onClick={() => removeQuickInfoRow(row.id)} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Видалити</button>
                   </article>
                 ))}
+              </section>
+
+              <section className="mt-6 space-y-3">
+                <h3 className="text-lg font-bold text-slate-900">Дистанційне навчання (класи 1-11)</h3>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.distanceLearningTitle} onChange={(e) => updateLandingField("distanceLearningTitle", e.target.value)} placeholder="Заголовок вкладки дистанційного навчання" />
+                  <input className="rounded-lg border border-slate-300 px-3 py-2" value={landingDraft.distanceLearningSubtitle} onChange={(e) => updateLandingField("distanceLearningSubtitle", e.target.value)} placeholder="Підзаголовок вкладки дистанційного навчання" />
+                </div>
+                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                  {distanceClassOptions.map((classNumber) => (
+                    <label key={classNumber} className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Клас {classNumber}</span>
+                      <input
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        value={landingDraft.distanceLearningLinks?.[classNumber] || ""}
+                        onChange={(e) =>
+                          setLandingDraft((prev) => ({
+                            ...prev,
+                            distanceLearningLinks: {
+                              ...prev.distanceLearningLinks,
+                              [classNumber]: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </label>
+                  ))}
+                </div>
               </section>
 
               {landingEditorError ? <p className="mt-4 text-sm font-semibold text-rose-600">{landingEditorError}</p> : null}
@@ -1097,12 +1125,51 @@ export default function Page() {
                 <div className={`h-1.5 w-24 rounded-full bg-gradient-to-r ${card.accent}`} />
                 <h3 className="mt-3 text-xl font-black text-slate-900">{card.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{card.text}</p>
-                <button className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-200">
+                <button
+                  onClick={() => setSelectedAudience(resolveAudienceByCardTitle(card.title))}
+                  className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-200"
+                >
                   Детальніше
                 </button>
               </article>
             ))}
           </section>
+        ) : null}
+
+        {selectedAudience ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3">
+            <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl md:p-6">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Детальна інформація</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">{audienceDetailsMap[selectedAudience].title}</h2>
+                  <p className="mt-2 text-sm text-slate-600">{audienceDetailsMap[selectedAudience].intro}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedAudience(null)}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                >
+                  Закрити
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {audienceDetailsMap[selectedAudience].sections.map((section) => (
+                  <article key={section.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-lg font-bold text-slate-900">{section.title}</h3>
+                    <ul className="mt-3 space-y-2">
+                      {section.items.map((item, index) => (
+                        <li key={`${section.title}-${index}`} className="flex items-start gap-2 text-sm text-slate-700">
+                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-sky-500" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {!user && publicPage === "auth" ? (
@@ -1111,7 +1178,7 @@ export default function Page() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Сторінка авторизації</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-900">Вхід або реєстрація</h2>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">Вхід у систему</h2>
                   <p className="text-sm text-slate-600">
                     Після входу ти отримаєш доступ до кабінету. Адміністратор може змінювати контент сайту.
                   </p>
@@ -1124,17 +1191,9 @@ export default function Page() {
                 </button>
               </div>
 
-              <div className="mt-3">
-                <input
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                  placeholder="Пошук новин за назвою або датою (наприклад: 16.04.2026 або 2026-04-16)"
-                  value={publicNewsQuery}
-                  onChange={(e) => setPublicNewsQuery(e.target.value)}
-                />
-              </div>
             </div>
 
-            <AuthSection onRegister={register} onLogin={login} loading={loading} />
+            <AuthSection onLogin={login} loading={loading} />
           </section>
         ) : null}
 
@@ -1366,6 +1425,179 @@ export default function Page() {
                     </li>
                   ))}
                 </ul>
+
+                {selectedQuickInfoAttachments.length ? (
+                  <div className="mt-6 space-y-3">
+                    <h4 className="text-lg font-bold text-slate-900">Файли розділу</h4>
+
+                    {selectedQuickInfoImages.length ? (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Фото ({selectedQuickInfoImages.length})
+                        </p>
+                        <div className="space-y-2">
+                          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
+                            <img
+                              src={selectedQuickInfoImages[selectedQuickInfoImageIndex]?.dataUrl}
+                              alt={selectedQuickInfoImages[selectedQuickInfoImageIndex]?.name || "Фото розділу"}
+                              className="h-[55vh] max-h-[78vh] w-full rounded-lg bg-white object-contain"
+                            />
+                            {selectedQuickInfoImages.length > 1 ? (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setSelectedQuickInfoImageIndex((index) =>
+                                      (index - 1 + selectedQuickInfoImages.length) % selectedQuickInfoImages.length,
+                                    )
+                                  }
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+                                  aria-label="Попереднє фото"
+                                >
+                                  ‹
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setSelectedQuickInfoImageIndex((index) =>
+                                      (index + 1) % selectedQuickInfoImages.length,
+                                    )
+                                  }
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-900"
+                                  aria-label="Наступне фото"
+                                >
+                                  ›
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+
+                          {selectedQuickInfoImages.length > 1 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {selectedQuickInfoImages.map((file, index) => (
+                                <button
+                                  key={file.id}
+                                  onClick={() => setSelectedQuickInfoImageIndex(index)}
+                                  className={`shrink-0 overflow-hidden rounded-lg border-2 ${
+                                    index === selectedQuickInfoImageIndex ? "border-sky-500" : "border-transparent"
+                                  }`}
+                                  aria-label={`Фото ${index + 1}`}
+                                >
+                                  <img src={file.dataUrl} alt={file.name} className="h-16 w-24 object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {selectedQuickInfoPdfFiles.length ? (
+                      <div className="space-y-3">
+                        {selectedQuickInfoPdfFiles.map((file) => (
+                          <article key={file.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                            <p className="mb-2 text-sm font-semibold text-slate-700">{file.name}</p>
+                            <iframe
+                              title={file.name}
+                              src={`${file.dataUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                              className="h-[78vh] w-full rounded-lg border border-slate-200 bg-white"
+                            />
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <a
+                                href={file.dataUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-800"
+                              >
+                                Відкрити PDF
+                              </a>
+                              <a
+                                href={file.dataUrl}
+                                download={file.name}
+                                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                              >
+                                Завантажити PDF
+                              </a>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-2">
+                      {selectedQuickInfoOtherFiles.map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.dataUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-sky-700"
+                          >
+                            {file.name}
+                          </a>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {publicPage === "distance-learning" ? (
+          <section className="mb-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Онлайн формат</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">{siteContent.distanceLearningTitle}</h2>
+                  <p className="text-sm text-slate-600">{siteContent.distanceLearningSubtitle}</p>
+                </div>
+                <button
+                  onClick={() => setPublicPage("landing")}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-slate-800 hover:scale-105 hover:shadow-lg"
+                >
+                  Назад на головну
+                </button>
+              </div>
+            </div>
+
+            <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+              <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Оберіть клас</label>
+                  <select
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                    value={selectedDistanceClass}
+                    onChange={(e) => setSelectedDistanceClass(e.target.value)}
+                  >
+                    {distanceClassOptions.map((classNumber) => (
+                      <option key={classNumber} value={classNumber}>Клас {classNumber}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-lg font-bold text-slate-900">Матеріали для {selectedDistanceClass} класу</h3>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Тут розміщуються посилання на Google Drive, Classroom, відеоуроки, домашні завдання та інші матеріали дистанційного навчання.
+                  </p>
+
+                  {selectedDistanceLearningLink ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <a
+                        href={selectedDistanceLearningLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-sky-700"
+                      >
+                        Відкрити матеріали класу
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm font-semibold text-amber-700">
+                      Для цього класу поки не додано посилання. Звернись до адміністратора або перевір пізніше.
+                    </p>
+                  )}
+                </div>
               </div>
             </article>
           </section>

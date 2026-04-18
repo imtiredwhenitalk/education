@@ -28,6 +28,7 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 	const [contentJson, setContentJson] = useState(() => JSON.stringify(siteContent, null, 2));
 	const [contentError, setContentError] = useState("");
 	const [savingContent, setSavingContent] = useState(false);
+	const [deletingUserId, setDeletingUserId] = useState("");
 
 	const classOptions = useMemo(
 		() => Array.from(new Set(users.map((u) => u.className))).sort((a, b) => a.localeCompare(b)),
@@ -126,6 +127,19 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 			setContentError("Не вдалося зберегти контент.");
 		} finally {
 			setSavingContent(false);
+		}
+	};
+
+	const handleDeleteUser = async (targetId: string, fullName: string) => {
+		if (!window.confirm(`Видалити користувача ${fullName}? Цю дію неможливо скасувати.`)) {
+			return;
+		}
+
+		setDeletingUserId(targetId);
+		try {
+			await onDeleteUser(targetId);
+		} finally {
+			setDeletingUserId("");
 		}
 	};
 
@@ -268,14 +282,11 @@ export default function AdminPanel({ users, admissions, onUpdateAdmission, onDel
 						<p className="text-xs text-slate-500">{u.className}</p>
 						{u.id !== user.id && (
 							<button
-								onClick={() => {
-									if (window.confirm(`Видалити користувача ${u.fullName}? Цю дію неможливо скасувати.`)) {
-										onDeleteUser(u.id);
-									}
-								}}
+								onClick={() => handleDeleteUser(u.id, u.fullName)}
+								disabled={deletingUserId === u.id}
 								className="mt-2 rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white transition-all duration-300 hover:bg-rose-700 hover:scale-105"
 							>
-								Видалити
+								{deletingUserId === u.id ? "Видалення..." : "Видалити"}
 							</button>
 						)}
 					</article>
