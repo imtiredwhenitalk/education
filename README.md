@@ -1,4 +1,4 @@
-# School Portal Fullstack
+# Луцький ліцей №4 імені Модеста Левицького Fullstack
 
 Готовий fullstack-проєкт шкільного порталу з:
 

@@ -368,7 +368,7 @@ const defaultInfoCards = [
 
 export const defaultSiteContent: SiteContent = {
   headerKicker: "Офіційний вебпортал ліцею",
-  headerTitle: "School Portal",
+  headerTitle: "Луцький ліцей №4 імені Модеста Левицького",
   headerSubtitle: "Сучасний сайт школи з новинами, навчальними сервісами і персональними кабінетами.",
   heroKicker: "Головна сторінка школи",
   heroTitle: "Луцький ліцей нового покоління: освіта, безпека, розвиток і технології в одному просторі",

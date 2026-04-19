@@ -80,7 +80,7 @@ class SiteContentUpdatePayload(BaseModel):
     content: Dict[str, Any]
 
 
-app = FastAPI(title="School Portal Python API")
+app = FastAPI(title="Луцький ліцей №4 імені Модеста Левицького Python API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -536,7 +536,6 @@ def dashboard(user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
             "teachers": len(teachers),
         }
     }
-
 
 @app.put("/api/site-content")
 def update_site_content(payload: SiteContentUpdatePayload, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:

@@ -3,7 +3,7 @@ export default function AboutPage() {
 		<section className="rounded-2xl border border-slate-300 bg-white/80 p-5 shadow-panel">
 			<h2 className="text-xl font-bold text-slate-900">Про проєкт</h2>
 			<p className="mt-3 text-sm leading-6 text-slate-700">
-				School Portal - це головний сайт школи, де зібрано і публічну інформацію, і внутрішню
+				Луцький ліцей №4 імені Модеста Левицького - це головний сайт школи, де зібрано і публічну інформацію, і внутрішню
 				систему для навчального процесу. Користувачі можуть читати шкільні новини, переглядати
 				статистику і працювати з персональними кабінетами.
 			</p>
