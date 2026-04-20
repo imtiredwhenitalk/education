@@ -172,7 +172,7 @@ const defaultQuickInfoMap: Record<string, QuickInfoItem> = {
     details: [
       "Приймальня: +380 (33) 000-00-00.",
       "Email: office@lyceum.edu.ua.",
-      "Адреса: м. Луцьк, вул. Шкільна, 10.",
+      "Місцезнаходження ліцею: м. Луцьк, вул. Винниченка, 4.",
     ],
   },
   "Новини ліцею": {

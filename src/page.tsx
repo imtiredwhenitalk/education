@@ -816,6 +816,35 @@ export default function Page() {
             <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-cyan-300/50 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-10 left-10 h-40 w-40 rounded-full bg-emerald-300/50 blur-2xl" />
 
+            <div className="absolute right-5 top-5 z-10 flex items-center gap-2">
+              <a
+                href="https://www.facebook.com/gymnasium4.lutsk.ua"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Facebook ліцею"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 transition hover:-translate-y-0.5 hover:bg-white hover:text-sky-700 hover:shadow-md"
+                title="Facebook"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M13.5 22v-8h2.6l.4-3h-3V9.2c0-.9.3-1.5 1.6-1.5h1.7V5c-.8-.1-1.7-.1-2.5-.1-2.5 0-4.3 1.5-4.3 4.4V11H7v3h2.9v8h3.6z" />
+                </svg>
+              </a>
+              <a
+                href="https://www.instagram.com/lutsklyceum_4/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Instagram ліцею"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 transition hover:-translate-y-0.5 hover:bg-white hover:text-rose-600 hover:shadow-md"
+                title="Instagram"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.9" />
+                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.9" />
+                  <circle cx="17.5" cy="6.6" r="1.2" fill="currentColor" />
+                </svg>
+              </a>
+            </div>
+
             <p className="relative text-xs uppercase tracking-[0.2em] text-sky-700">{siteContent.heroKicker}</p>
             <h2 className="relative mt-2 max-w-3xl text-3xl font-black leading-tight md:text-4xl">
               {siteContent.heroTitle}
@@ -1425,6 +1454,31 @@ export default function Page() {
                     </li>
                   ))}
                 </ul>
+
+                {selectedQuickInfoPage === "Контакти" ? (
+                  <div className="mt-6 rounded-xl border border-sky-200 bg-sky-50/70 p-4">
+                    <h4 className="text-base font-bold text-slate-900">Місцезнаходження ліцею</h4>
+                    <p className="mt-1 text-slate-700">м. Луцьк, вул. Винниченка, 4</p>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-sky-100 bg-white">
+                      <iframe
+                        title="Google карта ліцею"
+                        src="https://www.google.com/maps?q=Lutsk%2C%20Vynnychenka%204&output=embed"
+                        className="h-72 w-full"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        allowFullScreen
+                      />
+                    </div>
+                    <a
+                      href="https://www.google.com/maps/search/?api=1&query=Lutsk%2C%20Vynnychenka%204"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+                    >
+                      Відкрити в Google Maps
+                    </a>
+                  </div>
+                ) : null}
 
                 {selectedQuickInfoAttachments.length ? (
                   <div className="mt-6 space-y-3">
