@@ -80,7 +80,7 @@ class SiteContentUpdatePayload(BaseModel):
     content: Dict[str, Any]
 
 
-app = FastAPI(title="Луцький ліцей №4 імені Модеста Левицького Python API")
+app = FastAPI(title="Суський ліцей, Волинської області Python API")
 
 app.add_middleware(
     CORSMiddleware,

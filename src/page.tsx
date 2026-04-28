@@ -818,7 +818,7 @@ export default function Page() {
 
             <div className="absolute right-5 top-5 z-10 flex items-center gap-2">
               <a
-                href="https://www.facebook.com/gymnasium4.lutsk.ua"
+                href="https://www.facebook.com/groups/382254082708803/?ref=share"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Facebook ліцею"
@@ -830,17 +830,15 @@ export default function Page() {
                 </svg>
               </a>
               <a
-                href="https://www.instagram.com/lutsklyceum_4/"
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=suskyilyceum@susk31.ukr.education"
                 target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram ліцею"
+                rel="noreferrer noopener"
+                aria-label="Написати на електронну пошту ліцею через Gmail"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 transition hover:-translate-y-0.5 hover:bg-white hover:text-rose-600 hover:shadow-md"
-                title="Instagram"
+                title="Написати листа"
               >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-                  <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.9" />
-                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.9" />
-                  <circle cx="17.5" cy="6.6" r="1.2" fill="currentColor" />
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z" />
                 </svg>
               </a>
             </div>
@@ -1836,6 +1834,10 @@ export default function Page() {
             {tab === "about" ? <AboutPage /> : null}
           </>
         ) : null}
+
+        <footer className="mt-10 border-t border-slate-200 pt-4 text-center text-xs text-slate-500">
+          Суський ліцей, Волинської області 2026 всі права захищені
+        </footer>
       </div>
     </main>
   );
