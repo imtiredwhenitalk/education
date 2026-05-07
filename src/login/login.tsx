@@ -13,12 +13,6 @@ export default function LoginPanel(props: LoginPanelProps) {
 	return (
 		<article className="rounded-2xl border border-slate-300 bg-white/80 p-5 shadow-panel">
 			<h2 className="mb-4 text-xl font-bold text-slate-900">Вхід у систему</h2>
-			<div className="mb-3 rounded-lg border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900">
-				Тестові акаунти:<br />
-				admin@school.local / admin123<br />
-				teacher@school.local / teacher123<br />
-				student@school.local / student123
-			</div>
 			<div className="grid gap-3">
 				<input
 					className="rounded-lg border border-slate-300 px-3 py-2"
