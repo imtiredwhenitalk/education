@@ -20,6 +20,10 @@ JWT_ALG = "HS256"
 TOKEN_EXPIRE_DAYS = 7
 PORT = int(os.getenv("PORT", "8000"))
 
+
+def parse_cors_origins(value: str) -> List[str]:
+    return [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_FILE = ROOT_DIR / "backend_py" / "data" / "store.json"
 
@@ -82,10 +86,20 @@ class SiteContentUpdatePayload(BaseModel):
 
 app = FastAPI(title="Суський ліцей, Волинської області Python API")
 
+cors_origins_env = (os.getenv("CORS_ORIGINS") or "").strip()
+if cors_origins_env == "*":
+    cors_allow_origins = ["*"]
+else:
+    cors_allow_origins = parse_cors_origins(cors_origins_env) or [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://education-2-ilqk.onrender.com",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

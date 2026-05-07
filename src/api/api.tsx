@@ -1,6 +1,11 @@
 import type { AdmissionApplication, AdmissionStatus, NewsAttachment, NewsItem, SchoolUser, SiteContent, Stats } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_TARGET || "";
+const rawApiBase = (import.meta.env.VITE_API_TARGET || "").trim();
+const normalizedApiBase = rawApiBase.replace(/\/+$/, "");
+const API_BASE =
+	window.location.protocol === "https:" && normalizedApiBase.startsWith("http://")
+		? normalizedApiBase.replace(/^http:\/\//, "https://")
+		: normalizedApiBase;
 const TOKEN_KEY = "school_token";
 
 const readToken = () => window.localStorage.getItem(TOKEN_KEY);

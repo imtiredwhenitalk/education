@@ -62,6 +62,16 @@ docker compose ps
 - teacher@school.local / teacher123
 - student@school.local / student123
 
+## Deploy на Render (коротко)
+
+Якщо Frontend і Backend розгорнуті як 2 різні сервіси (2 домени), потрібно:
+
+- **Frontend (React/Vite):** у Render додати env `VITE_API_TARGET` = `https://<ваш-backend>.onrender.com` (обов'язково `https`).
+- **Backend (FastAPI):** дозволити CORS для домену фронта. Можна задати env `CORS_ORIGINS` як список через кому, напр.
+	`CORS_ORIGINS=https://<ваш-frontend>.onrender.com,http://localhost:5173`.
+
+Якщо `VITE_API_TARGET` не заданий, фронт буде робити запити відносно свого домену (і логін може падати).
+
 ## Основні API маршрути
 
 - `POST /api/auth/register`

@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 declare module "react" {
   export type Dispatch<A> = (value: A | ((prev: A) => A)) => void;
   export function useState<S>(initialState: S | (() => S)): [S, Dispatch<S>];
