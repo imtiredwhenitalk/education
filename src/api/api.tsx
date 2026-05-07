@@ -19,7 +19,10 @@ const request = async <T,>(url: string, options: RequestInit = {}) => {
 		headers.set("Authorization", `Bearer ${token}`);
 	}
 
-	const response = await fetch(url, { ...options, headers });
+	const response = await fetch(`${API_BASE}${url}`, {
+	...options,
+	headers,
+	});
 	const contentType = response.headers.get("content-type") || "";
 	const hasJson = contentType.includes("application/json");
 	const payload = hasJson ? await response.json().catch(() => ({})) : {};
