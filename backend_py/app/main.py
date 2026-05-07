@@ -87,14 +87,12 @@ class SiteContentUpdatePayload(BaseModel):
 app = FastAPI(title="Суський ліцей, Волинської області Python API")
 
 cors_origins_env = (os.getenv("CORS_ORIGINS") or "").strip()
-if cors_origins_env == "*":
+if not cors_origins_env or cors_origins_env == "*":
+    # Bearer-token auth (Authorization header) doesn't require cookies,
+    # so we can safely allow any origin without credentials.
     cors_allow_origins = ["*"]
 else:
-    cors_allow_origins = parse_cors_origins(cors_origins_env) or [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://education-2-ilqk.onrender.com",
-    ]
+    cors_allow_origins = parse_cors_origins(cors_origins_env)
 
 app.add_middleware(
     CORSMiddleware,
