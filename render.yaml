@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: education-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend_py.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      # Set this in Render dashboard if you want a stable secret.
+      - key: JWT_SECRET
+        generateValue: true
+      # Optional: lock CORS to your frontend domain(s). Comma-separated.
+      # Example: https://education-2-ilqk.onrender.com,http://localhost:5173
+      - key: CORS_ORIGINS
+        value: "*"
+
+  - type: static
+    name: education-frontend
+    plan: free
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # IMPORTANT: Vite reads env at build-time.
+      - key: VITE_API_TARGET
+        value: https://education-backend.onrender.com

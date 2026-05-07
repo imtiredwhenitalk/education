@@ -72,6 +72,15 @@ docker compose ps
 
 Якщо `VITE_API_TARGET` не заданий, фронт буде робити запити відносно свого домену (і логін може падати).
 
+### Backend (Python Web Service) — правильний Start Command
+
+У Render Web Service бєкенд **має слухати порт із змінної** `PORT`. Рекомендовано:
+
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn backend_py.app.main:app --host 0.0.0.0 --port $PORT`
+
+Також можна використати blueprint-файл `render.yaml` з цього репозиторію.
+
 ## Основні API маршрути
 
 - `POST /api/auth/register`
