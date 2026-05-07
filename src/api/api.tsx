@@ -98,20 +98,12 @@ export const api = {
 	},
 
 	getPublicNews: async () => {
-		const result = await request<{ news: NewsItem[] }>("/api/public/news", {
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
+		const result = await request<{ news: NewsItem[] }>("/api/public/news");
 		return result.news;
 	},
 
 	getPublicSiteContent: async () => {
-		const result = await request<{ content: Partial<SiteContent> }>("/api/public/site-content", {
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
+		const result = await request<{ content: Partial<SiteContent> }>("/api/public/site-content");
 		return result.content;
 	},
 
