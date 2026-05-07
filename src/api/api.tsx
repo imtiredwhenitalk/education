@@ -1,5 +1,6 @@
 import type { AdmissionApplication, AdmissionStatus, NewsAttachment, NewsItem, SchoolUser, SiteContent, Stats } from "../types";
 
+const API_BASE = import.meta.env.VITE_API_TARGET || "";
 const TOKEN_KEY = "school_token";
 
 const readToken = () => window.localStorage.getItem(TOKEN_KEY);
