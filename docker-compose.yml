@@ -1,4 +1,16 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: school_postgres
+    environment:
+      POSTGRES_DB: education
+      POSTGRES_USER: education
+      POSTGRES_PASSWORD: education
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   backend:
     build:
       context: .
@@ -6,8 +18,13 @@ services:
     container_name: school_backend_py
     env_file:
       - ./backend_py/.env
+    environment:
+      - DATABASE_URL=postgresql://education:education@db:5432/education
+      - IMPORT_NEWS_FROM_JSON=1
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     volumes:
       - ./backend_py/data:/app/backend_py/data
       - ./backend_py:/app/backend_py
@@ -18,7 +35,7 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: school_frontend
     environment:
-      - VITE_API_TARGET=https://education-1-0uro.onrender.com
+      - VITE_API_TARGET=http://localhost:8000
     ports:
       - "5173:5173"
     depends_on:
@@ -26,3 +43,6 @@ services:
     volumes:
       - ./:/app
       - /app/node_modules
+
+volumes:
+  pgdata:

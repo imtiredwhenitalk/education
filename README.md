@@ -12,7 +12,7 @@
 
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Python + FastAPI + JWT
-- Сховище: JSON-файл `backend_py/data/store.json`
+- Сховище: користувачі/заявки/контент — JSON `backend_py/data/store.json`, **новини — Postgres** (якщо задано `DATABASE_URL`)
 
 ## Швидкий старт
 

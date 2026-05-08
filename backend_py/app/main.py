@@ -13,6 +13,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 
+from sqlalchemy import delete, func, select
+
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 JWT_SECRET = os.getenv("JWT_SECRET", "dev_secret_key")
@@ -29,6 +31,73 @@ DATA_FILE = ROOT_DIR / "backend_py" / "data" / "store.json"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 lock = threading.Lock()
+
+from .db import engine, get_session, postgres_enabled
+from .models import Base as SqlBase
+from .models import News as NewsModel
+from .models import news_to_public_dict
+
+
+def _parse_iso_datetime(value: str) -> datetime:
+    raw = (value or "").strip()
+    if not raw:
+        return datetime.now(timezone.utc)
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(raw)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _init_postgres_schema_and_seed_news() -> None:
+    if not postgres_enabled() or engine is None:
+        return
+
+    SqlBase.metadata.create_all(bind=engine)
+
+    import_flag = (os.getenv("IMPORT_NEWS_FROM_JSON", "1") or "").strip().lower()
+    if import_flag not in {"1", "true", "yes", "y", "on"}:
+        return
+
+    # Seed Postgres with existing JSON news only when DB is empty.
+    session = get_session()
+    try:
+        count = session.execute(select(func.count(NewsModel.id))).scalar_one()
+        if count:
+            return
+
+        legacy = read_db().get("news")
+        if not isinstance(legacy, list) or not legacy:
+            return
+
+        for row in legacy:
+            if not isinstance(row, dict):
+                continue
+            news_id = (row.get("id") or "").strip()
+            if not news_id:
+                continue
+            exists = session.get(NewsModel, news_id)
+            if exists is not None:
+                continue
+
+            created_at = _parse_iso_datetime(row.get("createdAt") or "")
+            updated_at = row.get("updatedAt")
+            item = NewsModel(
+                id=news_id,
+                owner_id=(row.get("ownerId") or "").strip(),
+                title=(row.get("title") or "").strip(),
+                body=(row.get("body") or "").strip(),
+                author=(row.get("author") or "").strip()[:200],
+                created_at=created_at,
+                updated_at=_parse_iso_datetime(updated_at) if updated_at else None,
+                attachments=row.get("attachments") or [],
+            )
+            session.add(item)
+
+        session.commit()
+    finally:
+        session.close()
 
 class RegisterPayload(BaseModel):
     fullName: str
@@ -85,6 +154,11 @@ class SiteContentUpdatePayload(BaseModel):
 
 
 app = FastAPI(title="Суський ліцей, Волинської області Python API")
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    _init_postgres_schema_and_seed_news()
 
 cors_origins_env = (os.getenv("CORS_ORIGINS") or "").strip()
 if not cors_origins_env or cors_origins_env == "*":
@@ -245,6 +319,20 @@ def health() -> Dict[str, Any]:
 
 @app.get("/api/public/news")
 def public_news() -> Dict[str, Any]:
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            rows = (
+                session.execute(
+                    select(NewsModel).order_by(NewsModel.created_at.desc()).limit(8)
+                )
+                .scalars()
+                .all()
+            )
+            return {"news": [news_to_public_dict(x) for x in rows]}
+        finally:
+            session.close()
+
     db = read_db()
     rows = sorted(db["news"], key=lambda x: x.get("createdAt", ""), reverse=True)[:8]
     return {"news": rows}
@@ -365,7 +453,15 @@ def delete_user(user_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
     # Видаляємо всі пов'язані дані: новини, заявки
-    db["news"] = [n for n in db["news"] if n.get("ownerId") != user_id]
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            session.execute(delete(NewsModel).where(NewsModel.owner_id == user_id))
+            session.commit()
+        finally:
+            session.close()
+    else:
+        db["news"] = [n for n in db["news"] if n.get("ownerId") != user_id]
     db["admissions"] = [a for a in db["admissions"] if a.get("linkedStudentId") != user_id]
 
     # Якщо видаляється вчитель, відв'язуємо його від учнів.
@@ -463,6 +559,14 @@ def update_admission(admission_id: str, payload: AdmissionUpdatePayload, user: D
 
 @app.get("/api/news")
 def get_news(_user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            rows = session.execute(select(NewsModel).order_by(NewsModel.created_at.desc())).scalars().all()
+            return {"news": [news_to_public_dict(x) for x in rows]}
+        finally:
+            session.close()
+
     db = read_db()
     rows = sorted(db["news"], key=lambda x: x.get("createdAt", ""), reverse=True)
     return {"news": rows}
@@ -473,6 +577,27 @@ def create_news(payload: NewsPayload, user: Dict[str, Any] = Depends(auth_user))
     require_role(user, ["teacher", "admin"])
     if not payload.title.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="Title and body required")
+
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            now = datetime.now(timezone.utc)
+            item = NewsModel(
+                id=uid("n"),
+                owner_id=user["id"],
+                title=payload.title.strip(),
+                body=payload.body.strip(),
+                author=user["fullName"],
+                created_at=now,
+                updated_at=None,
+                attachments=sanitize_attachments(payload.attachments),
+            )
+            session.add(item)
+            session.commit()
+            session.refresh(item)
+            return {"news": news_to_public_dict(item)}
+        finally:
+            session.close()
 
     db = read_db()
     row = {
@@ -494,6 +619,28 @@ def update_news(news_id: str, payload: NewsPayload, user: Dict[str, Any] = Depen
     require_role(user, ["teacher", "admin"])
     if not payload.title.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="Title and body required")
+
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            item = session.get(NewsModel, news_id)
+            if item is None:
+                raise HTTPException(status_code=404, detail="News not found")
+
+            can_edit = user["role"] == "admin" or item.owner_id == user["id"] or item.author == user["fullName"]
+            if not can_edit:
+                raise HTTPException(status_code=403, detail="You can edit only your own news")
+
+            item.title = payload.title.strip()
+            item.body = payload.body.strip()
+            item.attachments = sanitize_attachments(payload.attachments)
+            item.updated_at = datetime.now(timezone.utc)
+            session.add(item)
+            session.commit()
+            session.refresh(item)
+            return {"news": news_to_public_dict(item)}
+        finally:
+            session.close()
 
     db = read_db()
 
@@ -519,6 +666,23 @@ def update_news(news_id: str, payload: NewsPayload, user: Dict[str, Any] = Depen
 @app.delete("/api/news/{news_id}")
 def delete_news(news_id: str, user: Dict[str, Any] = Depends(auth_user)) -> Dict[str, Any]:
     require_role(user, ["teacher", "admin"])
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            item = session.get(NewsModel, news_id)
+            if item is None:
+                raise HTTPException(status_code=404, detail="News not found")
+
+            can_delete = user["role"] == "admin" or item.owner_id == user["id"] or item.author == user["fullName"]
+            if not can_delete:
+                raise HTTPException(status_code=403, detail="You can delete only your own news")
+
+            session.delete(item)
+            session.commit()
+            return {"ok": True}
+        finally:
+            session.close()
+
     db = read_db()
 
     index = next((i for i, x in enumerate(db["news"]) if x["id"] == news_id), -1)
