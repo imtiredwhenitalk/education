@@ -1456,11 +1456,11 @@ export default function Page() {
                 {selectedQuickInfoPage === "Контакти" ? (
                   <div className="mt-6 rounded-xl border border-sky-200 bg-sky-50/70 p-4">
                     <h4 className="text-base font-bold text-slate-900">Місцезнаходження ліцею</h4>
-                    <p className="mt-1 text-slate-700">м. Луцьк, вул. Винниченка, 4</p>
+                    <p className="mt-1 text-slate-700">Волинська область, Луцький район, с. Суськ, вул. Молодіжна, 8</p>
                     <div className="mt-3 overflow-hidden rounded-lg border border-sky-100 bg-white">
                       <iframe
                         title="Google карта ліцею"
-                        src="https://www.google.com/maps?q=Lutsk%2C%20Vynnychenka%204&output=embed"
+                        src="https://www.google.com/maps?q=%D0%92%D0%BE%D0%BB%D0%B8%D0%BD%D1%81%D1%8C%D0%BA%D0%B0%20%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C%2C%20%D0%9B%D1%83%D1%86%D1%8C%D0%BA%D0%B8%D0%B9%20%D1%80%D0%B0%D0%B9%D0%BE%D0%BD%2C%20%D1%81.%20%D0%A1%D1%83%D1%81%D1%8C%D0%BA%2C%20%D0%B2%D1%83%D0%BB.%20%D0%9C%D0%BE%D0%BB%D0%BE%D0%B4%D1%96%D0%B6%D0%BD%D0%B0%2C%208&output=embed"
                         className="h-72 w-full"
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
@@ -1468,7 +1468,7 @@ export default function Page() {
                       />
                     </div>
                     <a
-                      href="https://www.google.com/maps/search/?api=1&query=Lutsk%2C%20Vynnychenka%204"
+                      href="https://www.google.com/maps/search/?api=1&query=%D0%92%D0%BE%D0%BB%D0%B8%D0%BD%D1%81%D1%8C%D0%BA%D0%B0%20%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C%2C%20%D0%9B%D1%83%D1%86%D1%8C%D0%BA%D0%B8%D0%B9%20%D1%80%D0%B0%D0%B9%D0%BE%D0%BD%2C%20%D1%81.%20%D0%A1%D1%83%D1%81%D1%8C%D0%BA%2C%20%D0%B2%D1%83%D0%BB.%20%D0%9C%D0%BE%D0%BB%D0%BE%D0%B4%D1%96%D0%B6%D0%BD%D0%B0%2C%208"
                       target="_blank"
                       rel="noreferrer"
                       className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"

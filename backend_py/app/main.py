@@ -26,16 +26,49 @@ PORT = int(os.getenv("PORT", "8000"))
 def parse_cors_origins(value: str) -> List[str]:
     return [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
 
+
+def _empty_db_snapshot() -> Dict[str, Any]:
+    return {"users": [], "news": [], "admissions": [], "siteContent": {}}
+
+
+def _normalize_db_snapshot(db: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(db or {})
+    if "users" not in normalized or not isinstance(normalized.get("users"), list):
+        normalized["users"] = []
+    if "news" not in normalized or not isinstance(normalized.get("news"), list):
+        normalized["news"] = []
+    if "admissions" not in normalized or not isinstance(normalized.get("admissions"), list):
+        normalized["admissions"] = []
+    if "siteContent" not in normalized or not isinstance(normalized.get("siteContent"), dict):
+        normalized["siteContent"] = {}
+    return normalized
+
+
+def _read_legacy_json_db() -> Dict[str, Any]:
+    with lock:
+        if not DATA_FILE.exists():
+            return _empty_db_snapshot()
+        with DATA_FILE.open("r", encoding="utf-8") as f:
+            db = json.load(f)
+    return _normalize_db_snapshot(db)
+
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_FILE = ROOT_DIR / "backend_py" / "data" / "store.json"
+SITE_CONTENT_ROW_ID = "main"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 lock = threading.Lock()
 
 from .db import engine, get_session, postgres_enabled
+from .models import Admission as AdmissionModel
 from .models import Base as SqlBase
 from .models import News as NewsModel
+from .models import SiteContent as SiteContentModel
+from .models import User as UserModel
+from .models import admission_to_dict
 from .models import news_to_public_dict
+from .models import site_content_to_dict
+from .models import user_to_dict
 
 
 def _parse_iso_datetime(value: str) -> datetime:
@@ -60,40 +93,88 @@ def _init_postgres_schema_and_seed_news() -> None:
     if import_flag not in {"1", "true", "yes", "y", "on"}:
         return
 
-    # Seed Postgres with existing JSON news only when DB is empty.
+    legacy = _read_legacy_json_db()
     session = get_session()
     try:
-        count = session.execute(select(func.count(NewsModel.id))).scalar_one()
-        if count:
-            return
+        if session.execute(select(func.count(UserModel.id))).scalar_one() == 0:
+            for row in legacy.get("users", []):
+                if not isinstance(row, dict):
+                    continue
+                user_id = (row.get("id") or "").strip()
+                email = (row.get("email") or "").strip().lower()
+                if not user_id or not email:
+                    continue
+                session.add(
+                    UserModel(
+                        id=user_id,
+                        email=email,
+                        password_hash=(row.get("passwordHash") or row.get("password_hash") or "").strip(),
+                        full_name=(row.get("fullName") or "").strip(),
+                        class_name=(row.get("className") or "").strip(),
+                        role=(row.get("role") or "").strip(),
+                        avatar_url=(row.get("avatarUrl") or "").strip(),
+                        bio=(row.get("bio") or "").strip(),
+                        theme=(row.get("theme") or "light").strip() or "light",
+                        assigned_teacher_id=row.get("assignedTeacherId"),
+                    )
+                )
 
-        legacy = read_db().get("news")
-        if not isinstance(legacy, list) or not legacy:
-            return
+        if session.execute(select(func.count(AdmissionModel.id))).scalar_one() == 0:
+            for row in legacy.get("admissions", []):
+                if not isinstance(row, dict):
+                    continue
+                admission_id = (row.get("id") or "").strip()
+                if not admission_id:
+                    continue
+                session.add(
+                    AdmissionModel(
+                        id=admission_id,
+                        full_name=(row.get("fullName") or "").strip(),
+                        student_birth_date=(row.get("studentBirthDate") or "").strip(),
+                        class_goal=(row.get("classGoal") or "").strip(),
+                        parent_name=(row.get("parentName") or "").strip(),
+                        parent_phone=(row.get("parentPhone") or "").strip(),
+                        email=(row.get("email") or "").strip().lower(),
+                        student_email=row.get("studentEmail"),
+                        notes=(row.get("notes") or "").strip(),
+                        status=(row.get("status") or "pending").strip(),
+                        assigned_teacher_id=row.get("assignedTeacherId"),
+                        linked_student_id=row.get("linkedStudentId"),
+                        admin_comment=(row.get("adminComment") or "").strip(),
+                        created_at=_parse_iso_datetime(row.get("createdAt") or ""),
+                        updated_at=_parse_iso_datetime(row.get("updatedAt") or "") if row.get("updatedAt") else None,
+                        attachments=row.get("attachments") or [],
+                    )
+                )
 
-        for row in legacy:
-            if not isinstance(row, dict):
-                continue
-            news_id = (row.get("id") or "").strip()
-            if not news_id:
-                continue
-            exists = session.get(NewsModel, news_id)
-            if exists is not None:
-                continue
+        if session.execute(select(func.count(NewsModel.id))).scalar_one() == 0:
+            for row in legacy.get("news", []):
+                if not isinstance(row, dict):
+                    continue
+                news_id = (row.get("id") or "").strip()
+                if not news_id:
+                    continue
+                session.add(
+                    NewsModel(
+                        id=news_id,
+                        owner_id=(row.get("ownerId") or "").strip(),
+                        title=(row.get("title") or "").strip(),
+                        body=(row.get("body") or "").strip(),
+                        author=(row.get("author") or "").strip()[:200],
+                        created_at=_parse_iso_datetime(row.get("createdAt") or ""),
+                        updated_at=_parse_iso_datetime(row.get("updatedAt") or "") if row.get("updatedAt") else None,
+                        attachments=row.get("attachments") or [],
+                    )
+                )
 
-            created_at = _parse_iso_datetime(row.get("createdAt") or "")
-            updated_at = row.get("updatedAt")
-            item = NewsModel(
-                id=news_id,
-                owner_id=(row.get("ownerId") or "").strip(),
-                title=(row.get("title") or "").strip(),
-                body=(row.get("body") or "").strip(),
-                author=(row.get("author") or "").strip()[:200],
-                created_at=created_at,
-                updated_at=_parse_iso_datetime(updated_at) if updated_at else None,
-                attachments=row.get("attachments") or [],
+        if session.execute(select(func.count(SiteContentModel.id))).scalar_one() == 0:
+            session.add(
+                SiteContentModel(
+                    id=SITE_CONTENT_ROW_ID,
+                    content=legacy.get("siteContent") if isinstance(legacy.get("siteContent"), dict) else {},
+                    updated_at=datetime.now(timezone.utc),
+                )
             )
-            session.add(item)
 
         session.commit()
     finally:
@@ -178,28 +259,97 @@ app.add_middleware(
 
 
 def read_db() -> Dict[str, Any]:
-    with lock:
-        if not DATA_FILE.exists():
-            return {"users": [], "news": [], "admissions": [], "siteContent": {}}
-        with DATA_FILE.open("r", encoding="utf-8") as f:
-            db = json.load(f)
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            users = [user_to_dict(item) for item in session.execute(select(UserModel)).scalars().all()]
+            news = [news_to_public_dict(item) for item in session.execute(select(NewsModel).order_by(NewsModel.created_at.desc())).scalars().all()]
+            admissions = [admission_to_dict(item) for item in session.execute(select(AdmissionModel).order_by(AdmissionModel.created_at.desc())).scalars().all()]
+            site_content_row = session.get(SiteContentModel, SITE_CONTENT_ROW_ID)
+            site_content = site_content_to_dict(site_content_row) if site_content_row is not None else {}
+            return _normalize_db_snapshot(
+                {
+                    "users": users,
+                    "news": news,
+                    "admissions": admissions,
+                    "siteContent": site_content,
+                }
+            )
+        except Exception:
+            return _read_legacy_json_db()
+        finally:
+            session.close()
 
-    if "users" not in db:
-        db["users"] = []
-    if "news" not in db:
-        db["news"] = []
-    if "admissions" not in db:
-        db["admissions"] = []
-    if "siteContent" not in db:
-        db["siteContent"] = {}
-
-    return db
+    return _read_legacy_json_db()
 
 
 def write_db(db: Dict[str, Any]) -> None:
+    normalized = _normalize_db_snapshot(db)
+
+    if postgres_enabled() and engine is not None:
+        session = get_session()
+        try:
+            session.execute(delete(UserModel))
+            for row in normalized["users"]:
+                if not isinstance(row, dict):
+                    continue
+                session.add(
+                    UserModel(
+                        id=(row.get("id") or "").strip(),
+                        email=(row.get("email") or "").strip().lower(),
+                        password_hash=(row.get("passwordHash") or row.get("password_hash") or "").strip(),
+                        full_name=(row.get("fullName") or "").strip(),
+                        class_name=(row.get("className") or "").strip(),
+                        role=(row.get("role") or "").strip(),
+                        avatar_url=(row.get("avatarUrl") or "").strip(),
+                        bio=(row.get("bio") or "").strip(),
+                        theme=(row.get("theme") or "light").strip() or "light",
+                        assigned_teacher_id=row.get("assignedTeacherId"),
+                    )
+                )
+
+            session.execute(delete(AdmissionModel))
+            for row in normalized["admissions"]:
+                if not isinstance(row, dict):
+                    continue
+                session.add(
+                    AdmissionModel(
+                        id=(row.get("id") or "").strip(),
+                        full_name=(row.get("fullName") or "").strip(),
+                        student_birth_date=(row.get("studentBirthDate") or "").strip(),
+                        class_goal=(row.get("classGoal") or "").strip(),
+                        parent_name=(row.get("parentName") or "").strip(),
+                        parent_phone=(row.get("parentPhone") or "").strip(),
+                        email=(row.get("email") or "").strip().lower(),
+                        student_email=row.get("studentEmail"),
+                        notes=(row.get("notes") or "").strip(),
+                        status=(row.get("status") or "pending").strip(),
+                        assigned_teacher_id=row.get("assignedTeacherId"),
+                        linked_student_id=row.get("linkedStudentId"),
+                        admin_comment=(row.get("adminComment") or "").strip(),
+                        created_at=_parse_iso_datetime(row.get("createdAt") or ""),
+                        updated_at=_parse_iso_datetime(row.get("updatedAt") or "") if row.get("updatedAt") else None,
+                        attachments=row.get("attachments") or [],
+                    )
+                )
+
+            session.execute(delete(SiteContentModel).where(SiteContentModel.id == SITE_CONTENT_ROW_ID))
+            session.add(
+                SiteContentModel(
+                    id=SITE_CONTENT_ROW_ID,
+                    content=normalized["siteContent"],
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+
+            session.commit()
+        finally:
+            session.close()
+        return
+
     with lock:
         with DATA_FILE.open("w", encoding="utf-8") as f:
-            json.dump(db, f, ensure_ascii=False, indent=2)
+            json.dump(normalized, f, ensure_ascii=False, indent=2)
             f.write("\n")
 
 

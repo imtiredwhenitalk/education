@@ -19,6 +19,7 @@ services:
       # Example: https://education-2-ilqk.onrender.com,http://localhost:5173
       - key: CORS_ORIGINS
         value: "*"
+      # Legacy migration only: copied once into Postgres when the database is empty.
       - key: IMPORT_NEWS_FROM_JSON
         value: "1"
 
